@@ -13,6 +13,8 @@ import pandas as pd
 import time
 from sklearn.manifold import TSNE
 from sklearn.cluster import KMeans, DBSCAN
+import skfuzzy
+from skfuzzy.cluster import cmeans
 
 def cluster_tsne(matrix_, outdir):
     info('Clustering using T-SNE')
@@ -56,6 +58,17 @@ def cluster_kmeans(matrix_, outdir):
         pkl.dump(clustering, open(pklpath, 'wb'))
         info('ncomp:{} elapsed time:{}'.format(ncomp, time.time() - t0))
 
+def cluster_fuzzy(matrix_, outdir):
+    info('Clustering using fuzzy c-means')
+    for ncomp in [2, 3, 4, 5]:
+        t0 = time.time()
+        clustering = KMeans(n_clusters=ncomp, random_state=0).fit(matrix_)
+        res = cmeans(matrix_, ncomp, m=2, error=0.005,
+                     maxiter=10000, init=None)
+        pklpath = pjoin(outdir, 'fuzzy{}.pkl'.format(ncomp))
+        pkl.dump(clustering, open(pklpath, 'wb'))
+        info('ncomp:{} elapsed time:{}'.format(ncomp, time.time() - t0))
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--csv', required=True, help='csv file')
@@ -83,6 +96,8 @@ def main():
         cluster_dbscan(matrix_, args.outdir)
     if all or args.algo.lower() == 'kmeans':
         cluster_kmeans(matrix_, args.outdir)
+    if all or args.algo.lower() == 'fuzzy':
+        cluster_fuzzy(matrix_, args.outdir)
 
 if __name__ == "__main__":
     main()
