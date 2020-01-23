@@ -23,9 +23,6 @@ def main():
     logging.basicConfig(format='[%(asctime)s] %(message)s',
     datefmt='%Y%m%d %H:%M', level=logging.DEBUG)
 
-    # wktpath = '/home/frodo/temp/_-34.52735604_-58.4857173_0.wkt'
-    # imgpath = '/home/frodo/temp/_-34.52735604_-58.4857173_0.jpg'
-
     if not os.path.exists(args.outdir): os.mkdir(args.outdir)
 
     files = sorted(os.listdir(args.wktdir))
@@ -38,12 +35,12 @@ def main():
         generate_mask_from_wkt(wktpath, maskpath)
 
 ##########################################################
-def generate_mask_from_wkt(wktpath, maskpath):
+def generate_mask_from_wkt(wktpath, maskpath, img=[]):
     backgrcolor = 0
     foregrcolor = [256, 256, 256]
 
-    img = np.ones((640, 640), dtype=np.uint8) * backgrcolor
-    # img = cv2.imread(imgpath)
+    if len(img) == 0:
+        img = np.ones((640, 640), dtype=np.uint8) * backgrcolor
 
     polys = []
 
@@ -61,7 +58,6 @@ def generate_mask_from_wkt(wktpath, maskpath):
 
     img = cv2.fillPoly(img, polys, foregrcolor, lineType=8, shift=0)
     cv2.imwrite(maskpath, img)
-    # cv2.imwrite('/tmp/out.png', img)
 
 if __name__ == "__main__":
     main()
