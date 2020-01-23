@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Generate dendogram
+"""Generate dendrogram
 
-rm /tmp/clusters/ -rf && python src/generate_dendogram.py  --rrspath ~/results/graffiti/rrs_200.txt --featpath ~/results/graffiti/features_resnet18_sample1000.csv --imdir ~/results/graffiti/20200101-deeplab/20200109-sp20180511_crops/crop/20180511-gsv_spcity --outdir /tmp/hieclust_analysis
+rm /tmp/clusters/ -rf && python src/generate_dendrogram.py  --rrspath ~/results/graffiti/rrs_200.txt --featpath ~/results/graffiti/features_resnet18_sample1000.csv --imdir ~/results/graffiti/20200101-deeplab/20200109-sp20180511_crops/crop/20180511-gsv_spcity --outdir /tmp/hieclust_analysis
 """
 
 import argparse
@@ -73,7 +73,7 @@ def main():
 
     for i, data in enumerate([features, features_random, features_max]):
         for j, meth in enumerate(meths):
-            generate_dendogram(data, meth, ax[i, j])
+            generate_dendrogram(data, meth, ax[i, j])
 
     for ax_, col in zip(ax[0], meths):
         ax_.set_title(col)
@@ -81,7 +81,7 @@ def main():
     for ax_, row in zip(ax[:, 0], dataslices):
         ax_.set_ylabel(row + '  ', rotation=0, size='large')
 
-    plotpath = pjoin(args.outdir, 'dendogram.pdf')
+    plotpath = pjoin(args.outdir, 'dendrogram.pdf')
     plt.savefig(plotpath)
 
     ########################################################## Analyze clusters
@@ -112,7 +112,7 @@ def main():
             pid = Popen(cmd, shell=True)
             print(pid)
 ##########################################################
-def generate_dendogram(X, meth, ax):
+def generate_dendrogram(X, meth, ax):
     distancethresh = 15
     model = AgglomerativeClustering(distance_threshold=distancethresh,
                                     linkage=meth, n_clusters=None)
