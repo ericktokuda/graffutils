@@ -12,51 +12,28 @@ from logging import debug, info
 import numpy as np
 import cv2
 import shapely.wkt
+from shapely.geometry import Polygon
 
 ##########################################################
-def draw_edge_mask_from_wkt(wktpath, maskpath, imgorig=[]):
+def draw_edge_mask_from_wkt(polys, maskpath, imgorig=[]):
     backgrcolor = 0
     foregrcolor = [256, 256, 256, 0.5]
 
     if len(imgorig) == 0:
         img = np.ones((640, 640), dtype=np.uint8) * backgrcolor
 
-    img = imgorig.copy()
-    polys = []
-
-    wktfh = open(wktpath)
-    f = shapely.wkt.loads(wktfh.read())
-
-    for poly in f:
-        coords = []
-        for x, y in zip(*poly.exterior.coords.xy):
-            coords.append([int(x), int(y)])
-        polys.append(np.array(coords))
-
-    wktfh.close()
-    polys = np.array(polys)
-
-    img = cv2.Canny(img,100,200)
-    # img = cv2.fillPoly(img, polys, foregrcolor, lineType=8, shift=0)
+    img = cv2.Canny(imgorig, 100, 200)
     stencil = np.zeros(img.shape).astype(img.dtype)
     cv2.fillPoly(stencil, polys, foregrcolor, lineType=8, shift=0)
     img = cv2.bitwise_and(img, stencil)
     cv2.imwrite(maskpath, img)
 
 ##########################################################
-def draw_mask_from_wkt(wktpath, maskpath, imgorig=[]):
-    backgrcolor = 0
-    foregrcolor = [256, 256, 256, 0.5]
-
-    if len(imgorig) == 0:
-        img = np.ones((640, 640), dtype=np.uint8) * backgrcolor
-
-    img = imgorig.copy()
-    polys = []
-
+def parse_wkt(wktpath):
     wktfh = open(wktpath)
     f = shapely.wkt.loads(wktfh.read())
 
+    polys = []
     for poly in f:
         coords = []
         for x, y in zip(*poly.exterior.coords.xy):
@@ -64,41 +41,43 @@ def draw_mask_from_wkt(wktpath, maskpath, imgorig=[]):
         polys.append(np.array(coords))
 
     wktfh.close()
-    polys = np.array(polys)
+    return np.array(polys)
 
-    # img = cv2.fillPoly(img, polys, foregrcolor, lineType=8, shift=0)
+def draw_mask_from_wkt(polys, maskpath, imgorig=[]):
+    backgrcolor = 0
+    foregrcolor = [256, 256, 256, 0.5]
+
+    if len(imgorig) == 0:
+        img = np.ones((640, 640), dtype=np.uint8) * backgrcolor
+
+    img = imgorig.copy()
     stencil = np.zeros(img.shape).astype(img.dtype)
     cv2.fillPoly(stencil, polys, foregrcolor, lineType=8, shift=0)
     img = cv2.bitwise_and(img, stencil)
     cv2.imwrite(maskpath, img)
 
 ##########################################################
-def draw_polygon_from_wkt(wktpath, maskpath, imgorig=[]):
-    backgrcolor = 0
-    foregrcolor = [256, 256, 256, 0.5]
-
+def draw_polygon_from_wkt(polys, maskpath, imgorig=[]):
+    edgecolor = (0, 0, 255)
     if len(imgorig) == 0:
         img = np.ones((640, 640), dtype=np.uint8) * backgrcolor
 
     img = imgorig.copy()
-    polys = []
-
-    wktfh = open(wktpath)
-    f = shapely.wkt.loads(wktfh.read())
-    wktfh.close()
-
-    for poly in f:
-        coords = []
-        for x, y in zip(*poly.exterior.coords.xy):
-            coords.append([int(x), int(y)])
-        polys.append(np.array(coords))
-
-    polys = np.array(polys)
 
     for p in polys:
-        cv2.polylines(img, np.int32([p]), 1, [0, 0, 255], thickness=10)
+        cv2.polylines(img, np.int32([p]), 1, edgecolor, thickness=10)
 
     cv2.imwrite(maskpath, img)
+
+def filter_polys_by_area(polys, minarea):
+    todel = []
+    for i, poly in enumerate(polys):
+        polyarea = Polygon(poly).area
+        if polyarea < minarea:
+            todel.append(i)
+
+    x = np.delete(polys, todel, axis=0)
+    return x
 
 ##########################################################
 def main():
@@ -114,20 +93,33 @@ def main():
     imgsdir = '/media/frodo/6TB_A/gsvcities/20180511-gsv_spcity/img'
     if not os.path.exists(args.outdir): os.mkdir(args.outdir)
 
+    samplesz = 30
+    minarea = 4900
+
+    acc = 0
+
     files = sorted(os.listdir(args.wktdir))
+
     for f in files:
+        if acc == samplesz: break
         if not f.endswith('.wkt'): continue
         wktpath = pjoin(args.wktdir, f)
         if os.stat(wktpath).st_size == 0: continue
         print(wktpath)
+
         maskpath = pjoin(args.outdir, f.replace('.wkt', '_mask.jpg'))
         edgespath = pjoin(args.outdir, f.replace('.wkt', '_edges.jpg'))
         polypath = pjoin(args.outdir, f.replace('.wkt', '_poly.jpg'))
         img = cv2.imread(pjoin(imgsdir, f.replace('.wkt', '.jpg')))
 
-        draw_mask_from_wkt(wktpath, maskpath, img)
-        draw_edge_mask_from_wkt(wktpath, edgespath, img)
-        draw_polygon_from_wkt(wktpath, polypath, img)
+        polys = parse_wkt(wktpath)
+        polys = filter_polys_by_area(polys, minarea)
+        if len(polys) == 0: continue
+        draw_mask_from_wkt(polys, maskpath, img)
+        draw_edge_mask_from_wkt(polys, edgespath, img)
+        draw_polygon_from_wkt(polys, polypath, img)
+        acc += 1
+        # input()
 
 if __name__ == "__main__":
     main()
