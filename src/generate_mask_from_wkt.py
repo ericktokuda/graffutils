@@ -65,7 +65,7 @@ def draw_polygon_from_wkt(polys, maskpath, imgorig=[]):
     img = imgorig.copy()
 
     for p in polys:
-        cv2.polylines(img, np.int32([p]), 1, edgecolor, thickness=10)
+        cv2.polylines(img, np.int32([p]), 1, edgecolor, thickness=3)
 
     cv2.imwrite(maskpath, img)
 
@@ -93,14 +93,17 @@ def main():
     imgsdir = '/media/frodo/6TB_A/gsvcities/20180511-gsv_spcity/img'
     if not os.path.exists(args.outdir): os.mkdir(args.outdir)
 
-    samplesz = 30
+    np.random.seed(0)
+    samplesz = 2000
     minarea = 4900
 
     acc = 0
 
     files = sorted(os.listdir(args.wktdir))
+    np.random.shuffle(files)
 
-    for f in files:
+    fh = open('/tmp/analyzedimgs.txt', 'w')
+    for i, f in enumerate(files):
         if acc == samplesz: break
         if not f.endswith('.wkt'): continue
         wktpath = pjoin(args.wktdir, f)
@@ -115,11 +118,14 @@ def main():
         polys = parse_wkt(wktpath)
         polys = filter_polys_by_area(polys, minarea)
         if len(polys) == 0: continue
-        draw_mask_from_wkt(polys, maskpath, img)
-        draw_edge_mask_from_wkt(polys, edgespath, img)
+        # draw_mask_from_wkt(polys, maskpath, img)
+        # draw_edge_mask_from_wkt(polys, edgespath, img)
+        # print(img)
         draw_polygon_from_wkt(polys, polypath, img)
+        fh.write(f.replace('.wkt', '') + '\n')
         acc += 1
-        # input()
+    fh.close()
+    print(acc)
 
 if __name__ == "__main__":
     main()

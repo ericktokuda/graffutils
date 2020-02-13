@@ -15,7 +15,7 @@ import pandas as pd
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--annotdir', required=True, help='Annotation directory')
-    parser.add_argument('--imdir', required=True, help='Images directory')
+    # parser.add_argument('--imdir', required=True, help='Images directory')
     args = parser.parse_args()
 
     logging.basicConfig(format='[%(asctime)s] %(message)s',
@@ -29,15 +29,35 @@ def main():
 
     files = sorted(os.listdir(args.annotdir))
 
-    labels = '-1,1,2,3'.split(',')
+    labels = '1,2,3'.split(',')
+    nlabels = len(labels)
     info('Using labels:{}'.format(labels))
     elements = { l:[] for l in labels }
 
+    nfiles = len(files)
+
+    df_file = []
+    df_xs = []
+    df_ys = []
+    df_labels = []
+
+    i = 0
     for f in files:
         if not f.endswith('.txt'): continue
         filepath = pjoin(args.annotdir, f)
-        labelstr = open(filepath).read().strip()
-        elements[labelstr] += [os.path.split(filepath)[-1].replace('.txt', '.jpg')]
+        arr = os.path.split(filepath)[-1].replace('.txt', '').split('_')
+        # labelstr = open(filepath).read().strip().split(',')
+        labels_ = open(filepath).read().strip().split(',')
+        for l in labels_:
+            df_file.append(f)
+            df_ys.append(arr[1])
+            df_xs.append(arr[2])
+            df_labels.append(l)
+            elements[l] += [os.path.split(filepath)[-1].replace('.txt', '.jpg')]
+            i += 1
+
+    df = pd.DataFrame({'filename': df_file, 'x': df_xs, 'y': df_ys, 'label': df_labels})
+    df.to_csv(pjoin(outdir, 'labels.csv'), index_label='id')
 
     fhs = {}
     for label in labels: # open
@@ -52,13 +72,13 @@ def main():
     for label in labels: # close
         fhs[label].close()
 
-    cmd = 'export PREV=${{PWD}} && for I in {}; '\
+    cmd = '# Replace <IMDIR> # export PREV=${{PWD}} && for I in {}; '\
         'do mkdir {}/label_${{I}} -p && '\
         'cd {} && '\
         'xargs --arg-file {}/label_${{I}}.lst '\
         'cp --target-directory="{}/label_${{I}}/"; done && '\
         'cd ${{PREV}}'. \
-        format(' '.join(labels), outdir, args.imdir, outdir, outdir)
+        format(' '.join(labels), outdir, '<IMDIR>', outdir, outdir)
     info('Check the target-directory prior to run it:')
     info(cmd)
 

@@ -26,9 +26,9 @@ def main():
 
 
     fh = open('/tmp/out.csv', 'w')
-    fh.write('id,file,lat,lon,')
-    arr = [ 'feat{:03d}'.format(x) for x in range(512)]
-    fh.write(','.join(arr))
+    fh.write('id,lat,lon')
+    # arr = [ 'feat{:03d}'.format(x) for x in range(512)]
+    # fh.write(','.join(arr))
     fh.write('\n')
 
     inds = list(range(len(files)))
@@ -49,8 +49,9 @@ def main():
         feat = [str(x) for x in feat]
         lat = (f.strip().split('_')[1])
         lon = (f.strip().split('_')[2])
-        fh.write('{:04d},{},{},{},'.format(inds[i], os.path.splitext(f)[0], lat, lon))
-        fh.write(','.join(feat))
+        # fh.write('{:04d},{},{},{},'.format(inds[i], os.path.splitext(f)[0], lat, lon))
+        fh.write('{:04d},{},{}'.format(inds[i], lat, lon))
+        # fh.write(','.join(feat))
         fh.write('\n')
 
 if __name__ == "__main__":
