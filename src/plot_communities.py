@@ -41,7 +41,12 @@ def main():
     info('Reload')
     g = igraph.read('/tmp/foo.graphml')
     g.simplify()
-    dendr = g.community_fastgreedy()
+    # dendr = g.community_fastgreedy()
+    # clusters = dendr.as_clustering()
+
+    # clusters = g.community_leading_eigenvector(clusters=5)
+    # clusters = g.community_edge_betweenness(clusters=5) # get stucked
+    dendr = g.community_walktrap()
     clusters = dendr.as_clustering()
     # get the membership vector
     membership = clusters.membership

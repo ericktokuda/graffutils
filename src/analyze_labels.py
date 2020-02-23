@@ -57,7 +57,8 @@ def main():
             i += 1
 
     df = pd.DataFrame({'filename': df_file, 'x': df_xs, 'y': df_ys, 'label': df_labels})
-    df.to_csv(pjoin(outdir, 'labels.csv'), index_label='id')
+    df.to_csv(pjoin(outdir, 'labels.csv'), index_label='id',
+              columns=['x', 'y', 'label'])
 
     fhs = {}
     for label in labels: # open
