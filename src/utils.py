@@ -21,6 +21,9 @@ rm /tmp/out -rf && python src/utils.py masksgenerator ~/results/graffiti/2020010
 
 # labelshuffler
 rm /tmp/out -rf && python src/utils.py labelshuffler ~/results/graffiti/20200209-sample_8003_annot_labels/labels.csv ~/results/graffiti/20200215-region1_ids.txt   --outdir /tmp/out
+
+# infomapparser
+rm /tmp/out -rf && python src/utils.py infomapparser ~/results/graffiti/20200221-citysp.clu ~/temp/citysp.graphml  ~/results/graffiti/20200209-sample_8003_annot_labels/labels.csv --outdir /tmp/out
 """
 
 import argparse
@@ -42,6 +45,7 @@ from featuresummarizer import FeatureSummarizer
 from masksgenerator import MasksGenerator
 from deeplabanalyzer import DeeplabAnalyzer
 from labelshuffler import LabelShuffler
+from infomapparser import InfomapParser
 
 ##########################################################
 def main():
@@ -68,6 +72,7 @@ def main():
         featuresummarizer = FeatureSummarizer,
         deeplabanalyzer = DeeplabAnalyzer,
         labelshuffler = LabelShuffler,
+        infomapparser = InfomapParser,
     )
 
     if len(arguments.args) == 0:
