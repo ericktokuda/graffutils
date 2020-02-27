@@ -53,7 +53,7 @@ class InfomapParser:
         clusters = allclusters[inds]
 
         objsdf['cluster'] = clusters
-        objsdf.to_csv(pjoin(outdir, 'out.csv'))
+        objsdf.to_csv(pjoin(outdir, 'clusters.csv'))
 
         for cl in np.unique(clusters):
             objsdf[objsdf.cluster == cl].\
