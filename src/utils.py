@@ -19,11 +19,11 @@ rm /tmp/out -rf && python src/utils.py featuresummarizer ~/results/graffiti/2020
 # masksgenerator
 rm /tmp/out -rf && python src/utils.py masksgenerator ~/results/graffiti/20200101-deeplab/20200109-sp20180511_crops/wkt/20180511-gsv_spcity/  /media/frodo/6TB_A/gsvcities/20180511-gsv_spcity/img --outdir /tmp/out
 
-# labelshuffler
-rm /tmp/out -rf && python src/utils.py labelshuffler ~/results/graffiti/20200209-sample_8003_annot_labels/labels.csv ~/results/graffiti/20200215-region1_ids.txt   --outdir /tmp/out
-
 # infomapparser
 rm /tmp/out -rf && python src/utils.py infomapparser ~/results/graffiti/20200221-citysp.clu ~/temp/citysp.graphml  ~/results/graffiti/20200209-sample_8003_annot_labels/labels.csv --outdir /tmp/out
+
+# labelshuffler
+rm /tmp/shuffle -rf && python src/utils.py labelshuffler /tmp/out/clusters.csv   --outdir /tmp/shuffle
 """
 
 import argparse

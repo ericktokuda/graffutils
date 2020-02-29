@@ -29,7 +29,7 @@ class LabelShuffler:
 
         df = pd.read_csv(labelspath, index_col='id')
 
-        nrealizations = 100
+        nrealizations = 5
         plotsize = 5
         nrows = df.shape[0]
         labels_all, counts_all = np.unique(df.label, return_counts=True)
@@ -38,8 +38,10 @@ class LabelShuffler:
         info('nrealizations:{}, nclusters:{}'.format(nrealizations, nclusters))
 
         counts = np.ones((nclusters, nlabels), dtype=float)
-        means = np.ones((nclusters, nlabels), dtype=float)
-        stds = np.ones((nclusters, nlabels), dtype=float)
+        counts_shuffled_all = np.ones((nclusters, nrealizations, nlabels), dtype=float) * 999
+        stds = np.ones((nclusters, nlabels), dtype=float) * 999
+        means = np.ones((nclusters, nlabels), dtype=float) * 999
+        stds = np.ones((nclusters, nlabels), dtype=float) * 999
 
         ########################################################## ids
         for k, cl in enumerate(np.unique(df.cluster)):
@@ -62,11 +64,12 @@ class LabelShuffler:
                 labels_reg = df[df.index.isin(ids)].label
                 labels_, counts_ = np.unique(labels_reg, return_counts=True)
 
-                for j, l in enumerate(labels_):
-                    counts_shuffled[i, l-1] = counts_[j]
+                for l in labels_:
+                    counts_shuffled[i, l-1] = counts_[l-1]
 
 
             counts[k, :] = count_reg_orig.astype(float)
+            counts_shuffled_all[k, :, :] = counts_shuffled
             means[k, :] = np.mean(counts_shuffled, axis=0)
             stds[k, :] = np.std(counts_shuffled, axis=0)
 
@@ -86,7 +89,7 @@ class LabelShuffler:
 
         palette = ['r', 'g', 'b']
 
-        # plot
+        # Plot errorbars
         labelsstr = ['type' + str(l) for l in np.arange(nlabels)]
         fig, ax = plt.subplots(1, nclusters,
                                figsize=(nclusters*plotsize, 1*plotsize),
@@ -103,6 +106,36 @@ class LabelShuffler:
         fig.suptitle('Z-test for the counts of the three types of '\
                         'graffiti for each cluster')
         plt.savefig(pjoin(outdir, 'label_shuffling.png'))
+
+        ########################################################## Plot distributions
+        import scipy.stats as stats
+        labelsstr = ['type' + str(l) for l in np.arange(nlabels)]
+        fig, ax = plt.subplots(1, nclusters,
+                               figsize=(nclusters*plotsize, 1*plotsize),
+                               squeeze=False, sharey='row')
+
+        for cl in range(nclusters):
+            for l in range(nlabels):
+                print(l)
+                print(counts_shuffled_all[cl, :, l])
+                input()
+                density = stats.gaussian_kde(counts_shuffled_all[cl, :, l])
+                # xs, yy = np.histogram(counts_shuffled_all[cl, :, l], bins=10, density=True)
+                xs, yy = np.histogram(counts_shuffled_all[cl, :, l], bins=10)
+
+                # print(X)
+                # input()
+                # plt.plot(x, density(x))
+
+                ax[0, cl].plot(xs, density(xs),)
+                # ax[0, cl].set_xlabel('Graffiti type')
+                # ax[0, cl].set_ylabel('Count')
+        
+        # fig.suptitle('Z-test for the counts of the three types of '\
+                        # 'graffiti for each cluster')
+
+        plt.savefig(pjoin(outdir, 'label_shuffling_distribs.png'))
+
         df.to_csv(pjoin(outdir, 'results.csv'), index=False)
 
 
