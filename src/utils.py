@@ -46,6 +46,7 @@ from masksgenerator import MasksGenerator
 from deeplabanalyzer import DeeplabAnalyzer
 from labelshuffler import LabelShuffler
 from infomapparser import InfomapParser
+from labelplotter import LabelPlotter
 
 ##########################################################
 def main():
@@ -73,6 +74,7 @@ def main():
         deeplabanalyzer = DeeplabAnalyzer,
         labelshuffler = LabelShuffler,
         infomapparser = InfomapParser,
+        labelplotter = LabelPlotter,
     )
 
     if len(arguments.args) == 0:
