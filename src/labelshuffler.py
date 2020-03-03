@@ -132,11 +132,81 @@ class LabelShuffler:
             ax[0, j].legend()
             ax[0, j].set_xlabel('Graffiti count')
         
-        # fig.suptitle('Z-test for the counts of the three types of '\
-                        # 'graffiti for each cluster')
+        fig.suptitle('Distrubution of number of graffiti occurences '\
+                        'per type (colours) and per cluster (plots)')
 
         plt.savefig(pjoin(outdir, 'label_shuffling_distribs.pdf'))
 
+        ########################################################## Plot mean/std relative
+        labelsstr = ['type' + str(l) for l in np.arange(nlabels)]
+        fig, ax = plt.subplots(1, nclusters,
+                               figsize=(nclusters*plotsize, 1*plotsize),
+                               squeeze=False, sharey='row')
+
+        nperregion = np.sum(counts_orig, axis=1)
+        for j in range(nclusters):
+            data = counts_perm[:, j, :] / nperregion[j]
+
+            ax[0, j].errorbar(labelsstr, np.mean(data, axis=0), np.std(data, axis=0),
+                              fmt='o', c='r')
+            ax[0, j].scatter(labelsstr, counts_orig[j, :] / nperregion[j], marker='D',
+                             c='b')
+            ax[0, j].set_xlabel('Graffiti type')
+            ax[0, j].set_ylabel('Count')
+        
+        fig.suptitle('Z-test for the counts of the three types of '\
+                        'graffiti for each cluster')
+        plt.savefig(pjoin(outdir, 'label_shuffling_relative.png'))
+        plt.clf()
+
+        ########################################################## Plot distributions relative
+        import scipy.stats as stats
+        labelsstr = ['type' + str(l) for l in np.arange(nlabels)]
+        fig, ax = plt.subplots(1, nclusters,
+                               figsize=(nclusters*plotsize, 1*plotsize),
+                               squeeze=False)
+                               # squeeze=False, sharey='row')
+
+        # print(counts_perm)
+        # input()
+        palette = np.array([
+            [127,201,127, 255],
+            [190,174,212, 255],
+            [253,192,134, 255],
+            [255,255,153, 255],
+        ])
+        palette = palette / 255
+        epsilon = 0.01
+
+        for j in range(nclusters):
+            for k in range(nlabels):
+                data = counts_perm[:, j, k] / nperregion[j]
+                density = stats.gaussian_kde(data)
+                # density = gaussian_kde(data)
+                xs = np.linspace(0, 1, num=100)
+                density.covariance_factor = lambda : .25
+                density._compute_covariance()
+                ys = density(xs)
+                ys /= np.sum(ys)
+                ax[0, j].plot(xs, ys, label=str(k), c=palette[k])
+
+                count_ref = counts_orig[j, k] / nperregion[j]
+                ax[0, j].scatter(count_ref, 0, c=[palette[k]])
+                plt.text(0.5, 0.9, 'samplesz:{:.0f}'.format(nperregion[j]),
+                         horizontalalignment='center', verticalalignment='center',
+                         fontsize='large', transform = ax[0, j].transAxes)
+
+
+            ax[0, j].legend()
+            ax[0, j].set_xlabel('Graffiti relative count')
+        
+        fig.suptitle('Distrubution of number of graffiti occurences '\
+                        'per type (colours) and per cluster (plots)')
+
+        print(nperregion)
+        plt.savefig(pjoin(outdir, 'label_shuffling_distribs_relative.pdf'))
+
+        ##########################################################
         df.to_csv(pjoin(outdir, 'results.csv'), index=False)
 
 
