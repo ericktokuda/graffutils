@@ -24,6 +24,12 @@ rm /tmp/out -rf && python src/utils.py infomapparser ~/results/graffiti/20200221
 
 # labelshuffler
 rm /tmp/shuffle -rf && python src/utils.py labelshuffler ~/results/graffiti/20200209-cityspold_8003_labels_clu.csv  --outdir /tmp/shuffle
+
+# labelplotter
+rm /tmp/foo -rf && python src/utils.py labelplotter ~/results/graffiti/20200209-cityspold_8003_labels_clu.csv ~/results/graffiti/20200222-citysp_infomap_areas.csv --outdir /tmp/foo
+
+# mapgenerator
+rm /tmp/foo -rf && python src/utils.py mapgenerator ~/results/graffiti/20200221-citysp.graphml  ~/results/graffiti/20200222-citysp_infomap.clu --outdir /tmp/foo
 """
 
 import argparse
@@ -47,6 +53,7 @@ from deeplabanalyzer import DeeplabAnalyzer
 from labelshuffler import LabelShuffler
 from infomapparser import InfomapParser
 from labelplotter import LabelPlotter
+from mapgenerator import MapGenerator
 
 ##########################################################
 def main():
@@ -75,6 +82,7 @@ def main():
         labelshuffler = LabelShuffler,
         infomapparser = InfomapParser,
         labelplotter = LabelPlotter,
+        mapgenerator = MapGenerator,
     )
 
     if len(arguments.args) == 0:
