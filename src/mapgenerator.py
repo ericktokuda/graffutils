@@ -15,6 +15,7 @@ import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import collections  as mc
+import matplotlib.patches as mpatches
 import geopandas as gpd
 import shapely
 import igraph
@@ -59,7 +60,7 @@ class MapGenerator:
         for attr in g.es.attributes():
             del(g.es[attr])
 
-        fig, ax = plt.subplots(figsize=(10, 10)) # Plot contour
+        fig, ax = plt.subplots(figsize=(10, 15)) # Plot contour
         gdf = gpd.read_file('/home/frodo/temp/citysp_shp/')
         shapefile = gdf.geometry.values[0]
         xs, ys = shapefile.exterior.xy
@@ -81,12 +82,15 @@ class MapGenerator:
         for i, l in enumerate(labels):
             data = labelsdf[labelsdf.label == l]
             ax.scatter(data.x, data.y, c='gray', linewidths=[1,1,1],
+                       label='Type ' + markers[i],
                        **(visual[i]))
         
         fig.patch.set_visible(False)
         ax.axis('off')
 
-        plt.savefig(pjoin('/tmp/types.png'))
+        # plt.tight_layout()
+        # plt.legend(loc='lower right', title='Graffiti types')
+        # plt.savefig(pjoin('/tmp/types.png'))
 
         ##########################################################
         palette = np.array([
@@ -126,7 +130,7 @@ class MapGenerator:
             lines[i, 1, 0] = g.vs[tgtid]['x']
             lines[i, 1, 1] = g.vs[tgtid]['y']
 
-        fig, ax = plt.subplots(figsize=(10, 10))
+        fig, ax = plt.subplots(figsize=(10, 15))
         lc = mc.LineCollection(lines, colors=ecolours, linewidths=0.5)
         ax.add_collection(lc)
         ax.autoscale()
@@ -138,4 +142,13 @@ class MapGenerator:
         
         fig.patch.set_visible(False)
         ax.axis('off')
+        plt.tight_layout()
+
+        handles = []
+        for i, p in enumerate(palette):
+            handles.append(mpatches.Patch(color=palette[i, :], label='C'+str(i+1)))
+
+        # plt.legend(handles=handles)
+
+        plt.legend(handles=handles, loc='lower right', title='Communities')
         plt.savefig(pjoin('/tmp/foo.png'))
