@@ -91,7 +91,8 @@ class MapGenerator:
         ax[0, 0].axis('off')
         # -46.826198999999995 -46.36508400000003 -24.008430999701822 -23.356292999687376
 
-        ax[0, 0].legend(loc=(0.7, 0.2), title='Graffiti types')
+        ax[0, 0].legend(loc=(0.7, 0.2), title='Graffiti types',
+                        fontsize='x-large', title_fontsize='x-large')
 
         ##########################################################
         palette = np.array([
@@ -142,13 +143,14 @@ class MapGenerator:
         
         fig.patch.set_visible(False)
         ax[0, 1].axis('off')
-        plt.tight_layout()
+        plt.tight_layout(pad=10)
 
         handles = []
         for i, p in enumerate(palette):
             handles.append(mpatches.Patch(color=palette[i, :], label='C'+str(i+1)))
 
         # plt.legend(handles=handles)
-        ax[0, 1].legend(handles=handles, loc=(.7, .15), title='Communities')
+        ax[0, 1].legend(handles=handles, loc=(.7, .15), title='Communities',
+                        fontsize='x-large', title_fontsize='x-large')
 
         plt.savefig(pjoin(outdir, 'maps.png'))

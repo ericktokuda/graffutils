@@ -29,7 +29,7 @@ rm /tmp/shuffle -rf && python src/utils.py labelshuffler ~/results/graffiti/2020
 rm /tmp/foo -rf && python src/utils.py labelplotter ~/results/graffiti/20200209-cityspold_8003_labels_clu.csv ~/results/graffiti/20200222-citysp_infomap_areas.csv --outdir /tmp/foo
 
 # mapgenerator
-rm /tmp/foo -rf && python src/utils.py mapgenerator ~/results/graffiti/20200221-citysp.graphml  ~/results/graffiti/20200222-citysp_infomap.clu --outdir /tmp/foo
+rm /tmp/foo -rf && python src/utils.py mapgenerator ~/results/graffiti/20200221-citysp.graphml  ~/results/graffiti/20200209-cityspold_8003_labels_clu.csv ~/results/graffiti/20200222-citysp_infomap.clu --outdir /tmp/foo
 """
 
 import argparse
@@ -60,17 +60,18 @@ def main():
     t0 = time.time()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('args', nargs='*', help='1: function 2-*: function arguments')
-    parser.add_argument('--outdir', default='/tmp/out/', help='Output dir')
+    parser.add_argument('--outdir', default='/tmp/', help='Output dir')
     arguments = parser.parse_args()
 
     logging.basicConfig(format='[%(asctime)s] %(message)s',
     datefmt='%Y%m%d %H:%M', level=logging.INFO)
 
     if os.path.exists(arguments.outdir):
-        info('Path {} already exists. Aborting...'.format(arguments.outdir))
-        return
+        info('Path {} already exists...'.format(arguments.outdir))
+    else:
+        os.mkdir(arguments.outdir)
+        # return
 
-    os.mkdir(arguments.outdir)
 
     options = dict(
         labelanalyzer = LabelAnalyzer,

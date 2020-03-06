@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FormatStrFormatter
 
 class LabelPlotter:
     def __init__(self):
@@ -69,14 +70,47 @@ class LabelPlotter:
             ys = np.zeros(nclusters)
             for k, cl in enumerate(clusters):
                 ys[k] = len(data[data.cluster == cl]) / np.sum(clustersums[k, :])
-                # print(cl, l, d)
-            ax[0, i].bar(clusters_str, ys, color=colours)
-            ax[0, i].axhline(y=len(df[df.label == l])/totalrows, linestyle='--')
-            ax[0, i].set_title('Type {}'.format(labelsmap[l]))
-            ax[0, i].set_ylabel('Ratio of Type {} inside community'.\
-                                format(labelsmap[l]))
-        # print(df.describe())
-        fig.suptitle('Ratio of types of graffiti inside each cluster')
+
+            barplot = ax[0, i].barh(list(reversed(clusters_str)), list(reversed(ys)),
+                                    color=colours)
+
+            ax[0, i].axvline(x=len(df[df.label == l])/totalrows, linestyle='--')
+            ax[0, i].text(len(df[df.label == l])/totalrows + 0.05,
+                          -0.7, 'ref',
+                          ha='center', va='bottom', rotation=0, color='royalblue')
+            reftick = len(df[df.label == l])/totalrows
+            ax[0, i].set_xlim(0, 1)
+            ax[0, i].set_title('Ratio of Type {} inside each community'.\
+                                format(r"$\bf{" + str(labelsmap[l]) + "}$"),
+                               size='medium', pad=30)
+            ax[0, i].xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+            ax[0, i].set_xticks([0, .25, 0.5, .75, 1.0])
+            ax[0, i].spines['top'].set_color('gray')
+            ax[0, i].xaxis.set_ticks_position('top')
+            ax[0, i].tick_params(axis='x', which='both', length=0, colors='gray')
+            ax[0, i].xaxis.grid(True, alpha=0.4)
+            ax[0, i].set_axisbelow(True)
+
+            def autolabel(rects, ys):
+                for idx, rect in enumerate(rects):
+                    height = rect.get_height()
+                    # print(rect.get_x(), height)
+                    ax[0, i].text(rect.get_width()-0.05,
+                                  rect.get_y() + rect.get_height()/2.-0.15,
+                                  '{:.2f}'.format(ys[idx]), color='white',
+                                  ha='center', va='bottom', rotation=0)
+
+            autolabel(barplot, list(reversed(ys)))
+            # ax[0, i].axis("off")
+            for spine in ax[0, i].spines.values():
+                spine.set_edgecolor('dimgray')
+            ax[0, i].spines['bottom'].set_visible(False)
+            ax[0, i].spines['right'].set_visible(False)
+            ax[0, i].spines['left'].set_visible(False)
+
+        # plt.box(False)
+        # fig.suptitle('Ratio of graffiti types inside each cluster', size='x-large')
+        plt.tight_layout(pad=5)
         plt.savefig(pjoin(outdir, 'count_per_type.pdf'))
         fig.clear()
 
@@ -93,13 +127,8 @@ class LabelPlotter:
             counts[i] = len(data)
             points = data[['x', 'y']].values
 
-            # from scipy.spatial import ConvexHull, convex_hull_plot_2d
-            # hull = ConvexHull(points)
-            # area = hull.volume
             countsnorm[i] = counts[i] / areas.iloc[i]
-            # print(i, counts[i], countsrel[i])
 
-        # ax[0, 0].bar(clusters_str, count)
         cumsum = 0.0
         axs = []
         for i, cl in enumerate(clusters):
@@ -126,5 +155,14 @@ class LabelPlotter:
         yfactor = 1
         ax[0, 0].bar(clusters_str, countsnorm / yfactor, color=colours)
         ax[0, 0].set_ylabel('Normalized count of graffitis')
+        ax[0, 0].set_xlabel('Community')
+        for spine in ax[0, i].spines.values():
+            spine.set_edgecolor('dimgray')
+        ax[0, i].ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+        ax[0, i].spines['top'].set_visible(False)
+        ax[0, i].spines['right'].set_visible(False)
+        ax[0, i].yaxis.grid(True, alpha=0.4)
+        ax[0, i].set_axisbelow(True)
+        # ax[0, i].spines['left'].set_visible(False)
 
         plt.savefig(pjoin(outdir, 'countsnormalized.pdf'))
