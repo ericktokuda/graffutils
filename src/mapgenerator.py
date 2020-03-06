@@ -25,8 +25,9 @@ class MapGenerator:
         np.random.seed(0)
 
     def run(self, args, outdir):
-        if len(args) < 3:
-            info('Please provide the (1)graphml, (2)labels csv, (3) clu file. '\
+        if len(args) < 4:
+            info('Please provide the (1)graphml, (2)shapefile, \
+                 (3)labels csv, (4) clu file. '\
                  'Aborting...')
             return
         elif not os.path.exists(args[0]):
@@ -34,8 +35,9 @@ class MapGenerator:
             return
 
         graphmlpath = args[0]
-        labelspath = args[1]
-        clupath = args[2]
+        shppath = args[1]
+        labelspath = args[2]
+        clupath = args[3]
         df = pd.read_csv(labelspath, index_col='id')
         totalrows = len(df)
 
@@ -60,11 +62,12 @@ class MapGenerator:
         for attr in g.es.attributes():
             del(g.es[attr])
 
-        fig, ax = plt.subplots(figsize=(10, 15)) # Plot contour
-        gdf = gpd.read_file('/home/frodo/temp/citysp_shp/')
+        fig, ax = plt.subplots(1, 2, figsize=(15, 12), squeeze=False) # Plot contour
+
+        gdf = gpd.read_file(shppath)
         shapefile = gdf.geometry.values[0]
         xs, ys = shapefile.exterior.xy
-        ax.plot(xs, ys, c='dimgray')
+        ax[0, 0].plot(xs, ys, c='dimgray')
 
         labelsdf = pd.read_csv(labelspath)
         clusters = np.unique(labelsdf.cluster)
@@ -81,16 +84,14 @@ class MapGenerator:
 
         for i, l in enumerate(labels):
             data = labelsdf[labelsdf.label == l]
-            ax.scatter(data.x, data.y, c='gray', linewidths=[1,1,1],
-                       label='Type ' + markers[i],
-                       **(visual[i]))
+            ax[0, 0].scatter(data.x, data.y, c='gray', linewidths=[1,1,1],
+                       label='Type ' + markers[i], **(visual[i]))
         
         fig.patch.set_visible(False)
-        ax.axis('off')
+        ax[0, 0].axis('off')
+        # -46.826198999999995 -46.36508400000003 -24.008430999701822 -23.356292999687376
 
-        # plt.tight_layout()
-        # plt.legend(loc='lower right', title='Graffiti types')
-        # plt.savefig(pjoin('/tmp/types.png'))
+        ax[0, 0].legend(loc=(0.7, 0.2), title='Graffiti types')
 
         ##########################################################
         palette = np.array([
@@ -130,18 +131,17 @@ class MapGenerator:
             lines[i, 1, 0] = g.vs[tgtid]['x']
             lines[i, 1, 1] = g.vs[tgtid]['y']
 
-        fig, ax = plt.subplots(figsize=(10, 15))
         lc = mc.LineCollection(lines, colors=ecolours, linewidths=0.5)
-        ax.add_collection(lc)
-        ax.autoscale()
+        ax[0, 1].add_collection(lc)
+        ax[0, 1].autoscale()
 
-        gdf = gpd.read_file('/home/frodo/temp/citysp_shp/')
+        gdf = gpd.read_file(shppath)
         shapefile = gdf.geometry.values[0]
         xs, ys = shapefile.exterior.xy
-        ax.plot(xs, ys, c='dimgray')
+        ax[0, 1].plot(xs, ys, c='dimgray')
         
         fig.patch.set_visible(False)
-        ax.axis('off')
+        ax[0, 1].axis('off')
         plt.tight_layout()
 
         handles = []
@@ -149,6 +149,6 @@ class MapGenerator:
             handles.append(mpatches.Patch(color=palette[i, :], label='C'+str(i+1)))
 
         # plt.legend(handles=handles)
+        ax[0, 1].legend(handles=handles, loc=(.7, .15), title='Communities')
 
-        plt.legend(handles=handles, loc='lower right', title='Communities')
-        plt.savefig(pjoin('/tmp/foo.png'))
+        plt.savefig(pjoin(outdir, 'maps.png'))
