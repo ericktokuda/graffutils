@@ -77,22 +77,28 @@ class MapGenerator:
         nlabels = len(labels)
 
         markers = ['$A$', '$B$', '$C$']
-        ss = [25, 30, 30]
-        edgecolours = ['#914232', '#917232', '#519132']
+        ss = [30, 35, 35]
+        # edgecolours = ['#914232', '#917232', '#519132']
+        edgecolours = ['#0000FF', '#FF0000', '#00FF00']
         visual = [ dict(marker=m, s=s, edgecolors=e) for m,s,e in \
-                  zip(markers, ss, edgecolours)]
+                  zip(['o', 'o', 'o'], ss, edgecolours)]
+                  # zip(markers, ss, edgecolours)]
 
         for i, l in enumerate(labels):
             data = labelsdf[labelsdf.label == l]
-            ax[0, 0].scatter(data.x, data.y, c='gray', linewidths=[1,1,1],
-                       label='Type ' + markers[i], **(visual[i]))
+            ax[0, 0].scatter(data.x, data.y, c=edgecolours[i],
+                             label='Type ' + markers[i],
+                             alpha=0.6,
+                             # linewidths=0.2,
+                             # edgecolor=(0.3, 0.3, 0.3, 1),
+                             **(visual[i]))
         
         fig.patch.set_visible(False)
         ax[0, 0].axis('off')
         # -46.826198999999995 -46.36508400000003 -24.008430999701822 -23.356292999687376
 
-        ax[0, 0].legend(loc=(0.7, 0.2), title='Graffiti types',
-                        fontsize='x-large', title_fontsize='x-large')
+        ax[0, 0].legend(loc=(0.6, 0.12), title='Graffiti types',
+                        fontsize='xx-large', title_fontsize='xx-large')
 
         ##########################################################
         palette = np.array([
@@ -103,7 +109,7 @@ class MapGenerator:
             [102,166,30],
             [230,171,2],
         ])
-        alpha = 0.7
+        alpha = 0.6
         palette /= 255.0
         colours = np.zeros((palette.shape[0], 4), dtype=float)
         colours[:, :3] = palette
@@ -150,7 +156,13 @@ class MapGenerator:
             handles.append(mpatches.Patch(color=palette[i, :], label='C'+str(i+1)))
 
         # plt.legend(handles=handles)
-        ax[0, 1].legend(handles=handles, loc=(.7, .15), title='Communities',
-                        fontsize='x-large', title_fontsize='x-large')
+        ax[0, 1].legend(handles=handles, loc=(.6, .12), title='Communities',
+                        fontsize='xx-large', title_fontsize='xx-large')
+
+        extent = ax[0, 0].get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+        fig.savefig(pjoin(outdir, 'map_types.png'), bbox_inches=extent.expanded(1.0, 1.0))
+
+        extent = ax[0, 1].get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+        fig.savefig(pjoin(outdir, 'map_comm.png'), bbox_inches=extent.expanded(1.0, 1.0))
 
         plt.savefig(pjoin(outdir, 'maps.png'))

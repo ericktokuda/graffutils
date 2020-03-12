@@ -29,7 +29,7 @@ rm /tmp/shuffle -rf && python src/utils.py labelshuffler ~/results/graffiti/2020
 rm /tmp/foo -rf && python src/utils.py labelplotter ~/results/graffiti/20200209-cityspold_8003_labels_clu.csv ~/results/graffiti/20200222-citysp_infomap_areas.csv --outdir /tmp/foo
 
 # mapgenerator
-rm /tmp/foo -rf && python src/utils.py mapgenerator ~/results/graffiti/20200221-citysp.graphml  ~/results/graffiti/20200209-cityspold_8003_labels_clu.csv ~/results/graffiti/20200222-citysp_infomap.clu --outdir /tmp/foo
+rm /tmp/foo -rf && python src/utils.py mapgenerator ~/results/graffiti/20200221-citysp.graphml ~/results/graffiti/20200224-citysp_shp/ ~/results/graffiti/20200209-cityspold_8003_labels_clu.csv ~/results/graffiti/20200222-citysp_infomap.clu --outdir /tmp/foo
 """
 
 import argparse

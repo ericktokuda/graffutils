@@ -39,7 +39,7 @@ class LabelPlotter:
         # labels_str = [str(l) for l in labels]
         plotsize = 5
 
-        alpha = 0.7
+        alpha = 0.6
         palette = np.array([
             [27.0,158,119],
             [217,95,2],
@@ -52,6 +52,10 @@ class LabelPlotter:
         colours = np.zeros((palette.shape[0], 4), dtype=float)
         colours[:, :3] = palette
         colours[:, -1] = alpha
+
+        coloursrev = []
+        for i in range(len(palette)):
+            coloursrev.append(colours[len(palette) - 1 - i, :])
 
         # Plot by type
         fig, ax = plt.subplots(1, nlabels,
@@ -72,22 +76,25 @@ class LabelPlotter:
                 ys[k] = len(data[data.cluster == cl]) / np.sum(clustersums[k, :])
 
             barplot = ax[0, i].barh(list(reversed(clusters_str)), list(reversed(ys)),
-                                    color=colours)
+                                    color=coloursrev)
 
             ax[0, i].axvline(x=len(df[df.label == l])/totalrows, linestyle='--')
             ax[0, i].text(len(df[df.label == l])/totalrows + 0.05,
-                          -0.7, 'ref',
-                          ha='center', va='bottom', rotation=0, color='royalblue')
+                          -0.7, 'ref', ha='center', va='bottom',
+                          rotation=0, color='royalblue',
+                          fontsize='large')
             reftick = len(df[df.label == l])/totalrows
             ax[0, i].set_xlim(0, 1)
-            ax[0, i].set_title('Ratio of Type {} inside each community'.\
+            ax[0, i].set_title('Ratio of Type {} within communities'.\
                                 format(r"$\bf{" + str(labelsmap[l]) + "}$"),
-                               size='medium', pad=30)
+                               size='large', pad=30)
             ax[0, i].xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
             ax[0, i].set_xticks([0, .25, 0.5, .75, 1.0])
             ax[0, i].spines['top'].set_color('gray')
             ax[0, i].xaxis.set_ticks_position('top')
-            ax[0, i].tick_params(axis='x', which='both', length=0, colors='gray')
+            ax[0, i].tick_params(axis='x', which='both', length=0, colors='gray',
+                                 labelsize='large')
+            ax[0, i].tick_params(axis='y', which='both', labelsize='large')
             ax[0, i].xaxis.grid(True, alpha=0.4)
             ax[0, i].set_axisbelow(True)
 
@@ -96,9 +103,10 @@ class LabelPlotter:
                     height = rect.get_height()
                     # print(rect.get_x(), height)
                     ax[0, i].text(rect.get_width()-0.05,
-                                  rect.get_y() + rect.get_height()/2.-0.15,
+                                  rect.get_y() + rect.get_height()/2.-0.18,
                                   '{:.2f}'.format(ys[idx]), color='white',
-                                  ha='center', va='bottom', rotation=0)
+                                  ha='center', va='bottom', rotation=0,
+                                  fontsize='large')
 
             autolabel(barplot, list(reversed(ys)))
             # ax[0, i].axis("off")
