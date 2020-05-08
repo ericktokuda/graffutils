@@ -1,6 +1,9 @@
+"""
+Script to find the best iou from the deeplab log
+"""
 import pandas as pd
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 fh = open('del.txt', 'r')
 
@@ -27,17 +30,14 @@ while True:
 
     res.append([ckpt, iou0, iou1, (iou0+iou1)/2])
 
-
     if ckpt == 9730: break
 
 fh.close()
-
 
 fh = open('/tmp/iou.csv', 'w')
 for r in res:
     fh.write(','.join([ str(x) for x in r ]) + '\n')
 fh.close()
-import matplotlib.pyplot as plt
 
 res = np.array(res)
 plt.scatter(res[:, 0], res[:, 3])
