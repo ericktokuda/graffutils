@@ -1,0 +1,2 @@
+scikit-fuzzy
+img2vec_pytorch
