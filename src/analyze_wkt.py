@@ -39,18 +39,18 @@ def parse_areas_from_wkts(latstr, lonstr, wktdir, minarea):
     pref = pjoin(wktdir, '_{}_{}_'.format(latstr, lonstr))
 
     allareas = []
-    nviews = 0
+    nviews = 0; nsmall = 0
     for heading in headings:
         wktpath = pref + heading + '.wkt'
         try:
             areas = np.array(get_areas_from_wkt(wktpath))
         except Exception as e:
             continue
-
-        areas = areas[areas < minarea]
+        nsmall += np.sum(areas < minarea)
+        areas = areas[areas >= minarea]
         nviews += 1
         allareas.extend(areas)
-    return allareas, nviews
+    return allareas, nviews, nsmall
 
 ##########################################################
 def main():
@@ -74,7 +74,7 @@ def main():
         arr = lastline.strip().split(',')
         if len(arr) > 0: startingidx = int(arr[0]) + int(arr[3])
     else:
-        open(outpath, 'w').write('idx,lat,lon,nviews,noccur,totalarea\n')
+        open(outpath, 'w').write('idx,lat,lon,nviews,nsmall,nlarge,arealarge\n')
 
     outfh = open(outpath, 'a')
 
@@ -84,10 +84,10 @@ def main():
         f = files[i]
         if not f.endswith('.wkt'): i += 1; continue
         _, latstr, lonstr, _ = f.split('_')
-        allareas, nviews = parse_areas_from_wkts(latstr, lonstr, args.wktdir,
+        allareas, nviews, nsmall = parse_areas_from_wkts(latstr, lonstr, args.wktdir,
                 args.minarea)
-        outfh.write('{},{},{},{},{},{}\n'.format(i, latstr, lonstr, nviews,
-            len(allareas), int(np.sum(allareas))))
+        outfh.write('{},{},{},{},{},{},{}\n'.format(i, latstr, lonstr, nviews,
+            nsmall, len(allareas), int(np.sum(allareas))))
         i += nviews
 
     outfh.close()
