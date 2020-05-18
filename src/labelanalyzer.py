@@ -9,76 +9,55 @@ from os.path import join as pjoin
 from logging import debug, info
 import os
 import pandas as pd
+import inspect
 
-class LabelAnalyzer:
-    """Count labels in a folder (each file contains a label -1,0,1,2)
-         python src/utils.py analyzelabels ~/results/graffiti/ANNOTDIR/ ~/results/graffiti/IMDIR/ --analyzelabels --outdir /tmp/out
+#############################################################
+def info(*args):
+    pref = datetime.now().strftime('[%y%m%d %H:%M:%S]')
+    print(pref, *args, file=sys.stdout)
+
+#############################################################
+def summarize_from_dir(annotdir, outdir):
+    """Summarize @annotdir csv annotations in .txt format and output
+    summary to @outdir
     """
-    def __init__(self):
-        pass
+    info(inspect.stack()[0][3] + '()')
+    if not os.path.exists(outdir): os.mkdir(outdir)
 
-    def run(self, args, outdir):
-        if len(args) < 2:
-            info('Please provide (1)annotation and (2)images dir as arguments')
-            return
-        elif not os.path.exists(args[0]) or not os.path.exists(args[1]):
-            info('Please check if {} and {} exist'.format(args[0], args[1]))
-            return
-        annotdir = args[0]
-        imdir = args[1]
+    files = sorted(os.listdir(annotdir))
 
-        files = sorted(os.listdir(annotdir))
+    labels = '1 2 3'.split(' ')
+    nlabels = len(labels)
+    info('Using labels:{}'.format(labels))
+    elements = { l:[] for l in labels }
 
-        labels = '1,2,3'.split(',')
-        nlabels = len(labels)
-        info('Using labels:{}'.format(labels))
-        elements = { l:[] for l in labels }
+    nfiles = len(files)
 
-        nfiles = len(files)
+    cols = 'img,x,y,label'.split(',')
+    data = []
+    for f in files:
+        if not f.endswith('.txt'): continue
+        filepath = pjoin(annotdir, f)
+        _, y, x, heading = os.path.split(filepath)[-1].replace('.txt', '').split('_')
+        labels_ = open(filepath).read().strip().split(',')
 
-        df_file = []
-        df_xs = []
-        df_ys = []
-        df_labels = []
+        for l in labels_: # each label in the file correspond to a new row
+            img = f.replace('.txt', '.jpg')
+            data.append([img, x, y, l])
 
-        i = 0
-        for f in files:
-            if not f.endswith('.txt'): continue
-            filepath = pjoin(annotdir, f)
-            arr = os.path.split(filepath)[-1].replace('.txt', '').split('_')
-            labels_ = open(filepath).read().strip().split(',')
-            for l in labels_:
-                df_file.append(f)
-                df_ys.append(arr[1])
-                df_xs.append(arr[2])
-                df_labels.append(l)
-                elements[l] += [os.path.split(filepath)[-1].replace('.txt', '.jpg')]
-                i += 1
+    df = pd.DataFrame(data, columns=cols)
+    df.to_csv(pjoin(outdir, 'labels.csv'), index_label='id',)
 
-        df = pd.DataFrame({'filename': df_file, 'x': df_xs, 'y': df_ys, 'label': df_labels})
-        df.to_csv(pjoin(outdir, 'labels.csv'), index_label='id',
-                  columns=['x', 'y', 'label'])
+    for l in labels: # open
+        listpath = os.path.join(outdir, 'label_{}.lst'.format(l))
+        df[df.label == l].to_csv(listpath, columns=['img'], index=False)
 
-        fhs = {}
-        for label in labels: # open
-            listpath = os.path.join(outdir, 'label_{}.lst'.format(label))
-            fhs[label] = open(listpath, 'w') 
-            info('Creating file {}'.format(listpath))
-
-        for label, elements in elements.items():
-            info('label {}: {} elements'.format(label, len(elements)))
-            fhs[label].write('\n'.join(elements))
-
-        for label in labels: # close
-            fhs[label].close()
-
-        cmd = '# Replace <IMDIR> # export PREV=${{PWD}} && for I in {}; '\
-            'do mkdir {}/label_${{I}} -p && '\
-            'cd {} && '\
-            'xargs --arg-file {}/label_${{I}}.lst '\
-            'cp --target-directory="{}/label_${{I}}/"; done && '\
-            'cd ${{PREV}}'. \
-            format(' '.join(labels), outdir, '<IMDIR>', outdir, outdir)
-        info('Check the target-directory prior to run it:')
-        info(cmd)
-
+    cmd = '# export PREV=${{PWD}} && for I in {}; '\
+        'do mkdir {}/label_${{I}} -p && '\
+        'cd {} && '\
+        'xargs --arg-file {}/label_${{I}}.lst '\
+        'cp --target-directory="{}/label_${{I}}/"; done && '\
+        'cd ${{PREV}}'. \
+        format(' '.join(labels), outdir, '<IMDIR>', outdir, outdir)
+    info('# If you want to copy the images, replace <IMDIR> and run:')
+    info(cmd)
