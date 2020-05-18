@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Analyze WKTs generated from the masks from deeplab
+"""Analyze masks in wkt format obtained using deeplab
 """
 
 import argparse

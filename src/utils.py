@@ -43,8 +43,8 @@ import pandas as pd
 import pickle as pkl
 
 
-from labelanalyzer import LabelAnalyzer
-from clustering import Clustering
+# from labelanalyzer import LabelAnalyzer
+# from clustering import Clustering
 from filterbysize import FilterBySize
 from featureextractor import FeatureExtractor
 from featuresummarizer import FeatureSummarizer
@@ -74,8 +74,8 @@ def main():
 
 
     options = dict(
-        labelanalyzer = LabelAnalyzer,
-        clustering = Clustering,
+        # labelanalyzer = LabelAnalyzer,
+        # clustering = Clustering,
         filterbysize = FilterBySize,
         featureextractor = FeatureExtractor,
         featuresummarizer = FeatureSummarizer,
