@@ -115,7 +115,7 @@ def process(clusterlabelspath, outdir):
             y = filtered.y
             plot_pdf(x, y, [xx, yy], axs[i, j])
 
-    plt.savefig(pjoin(outdir, 'pdfs.pdf'))
+    plt.savefig(pjoin(outdir, 'density.png'))
     
 ##########################################################
 def plot_pdf(x, y, grid, ax):
