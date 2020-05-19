@@ -79,61 +79,69 @@ def plot_hist2d(x, y, outdir):
     plt.title('Frequency histogram')
     plt.savefig(pjoin(outdir, 'hist2d.pdf'))
 
-#############################################################
-def process(clusterlabelspath, outdir):
+##########################################################
+def plot_densities(df, xx, yy, outdir):
+    """Plot the densities in the grid @xx, @yy
+    """
     info(inspect.stack()[0][3] + '()')
-    df = pd.read_csv(clusterlabelspath)
 
-    labels = '1 2 3'.split(' ')
-    annotators = 'er he'.split(' ')
+    annotators = np.unique(df.annotator)
+    labels = np.unique(df.label)
 
-    nrows = 2;  ncols = 3
+    nrows = len(annotators);  ncols = len(labels)
     figscale = 4
     fig, axs = plt.subplots(nrows, ncols, squeeze=False,
                 figsize=(ncols*figscale, nrows*figscale))
-
-    marginx = (max(df.x) - min(df.x))/10
-    marginy = (max(df.y) - min(df.y))/10
-
-    xrange = [np.min(df.x) - marginx, np.max(df.x) + marginx]
-    yrange = [np.min(df.y) - marginy - .1, np.max(df.y) + marginy]
-    xx, yy = np.mgrid[xrange[0]:xrange[1]:100j, yrange[0]:yrange[1]:100j]
-
-    # plt.scatter(df.x, df.y); plt.savefig(pjoin(outdir, 'points.pdf'))
-    # plot_hist2d(x, y, outdir)
-    # plot_surface(f, x, y, xx, yy, outdir)
-    # plot_contours(f, x, y, xx, yy, xrange, yrange, outdir)
-    # plot_surface(f, x, y, xx, yy, outdir)
-    # plot_wireframe(f, x, y, xx, yy, outdir)
-
     for i, anno in enumerate(annotators):
         axs[i, 0].set_ylabel('Annotator {}'.format(i))
         for j, l in enumerate(labels):
             if i == 0: axs[i, j].set_title('Type {}'.format(l))
             filtered = df[(df.annotator == anno) & (df.label == int(l))]
-            x = filtered.x
-            y = filtered.y
-            plot_pdf(x, y, [xx, yy], axs[i, j])
+            f = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy)
+            axs[i, j].scatter(xx, yy, c=f)
 
+    # gdf = gpd.read_file(shppath)
+    # shapefile = gdf.geometry.values[0]
+    # xs, ys = shapefile.exterior.xy
+    # ax[0, 0].plot(xs, ys, c='dimgray')
     plt.savefig(pjoin(outdir, 'density.png'))
-    
+
 ##########################################################
-def plot_pdf(x, y, grid, ax):
-    """Plot the kernel density estimation using @data on the @grid
-    """
-    info(inspect.stack()[0][3] + '()')
-
-    xx = grid[0]
-    yy = grid[1]
-
-
+def compute_pdf_over_grid(x, y, xx, yy):
     positions = np.vstack([xx.ravel(), yy.ravel()])
     values = np.vstack([x, y])
     kernel = stats.gaussian_kde(values)
-    f = np.reshape(kernel(positions).T, xx.shape)
+    return np.reshape(kernel(positions).T, xx.shape)
 
-    ax.scatter(xx, yy, c=f)
+##########################################################
+def create_meshgrid(x, y, relmargin=.1):
+    """Create a meshgrid for @x and @y with margins
+    Receives  and returns a ret
+    """
+    info(inspect.stack()[0][3] + '()')
+    marginx = (max(x) - min(x)) * relmargin
+    marginy = (max(y) - min(y)) * relmargin
 
+    xrange = [np.min(x) - marginx, np.max(x) + marginx]
+    yrange = [np.min(y) - marginy - .1, np.max(y) + marginy]
+    return np.mgrid[xrange[0]:xrange[1]:100j, yrange[0]:yrange[1]:100j]
+
+#############################################################
+def process(clusterlabelspath, outdir):
+    info(inspect.stack()[0][3] + '()')
+    df = pd.read_csv(clusterlabelspath)
+    xx, yy = create_meshgrid(df.x, df.y, relmargin=.1)
+
+    # f = compute_pdf_over_grid(df.x, df.y, xx, yy)
+    # plt.scatter(df.x, df.y); plt.savefig(pjoin(outdir, 'points.pdf'))
+    # plot_hist2d(df.x, df.y, outdir)
+    # plot_surface(f, df.x, df.y, xx, yy, outdir)
+    # plot_contours(f, df.x, df.y, xx, yy, xrange, yrange, outdir)
+    # plot_surface(f, df.x, df.y, xx, yy, outdir)
+    # plot_wireframe(f, df.x, df.y, xx, yy, outdir)
+
+    plot_densities(df, xx, yy, outdir)
+    
 ##########################################################
 def main():
     info(inspect.stack()[0][3] + '()')
