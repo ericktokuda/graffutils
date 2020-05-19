@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-""" Evaluate with frozen model
-
-export CUDA_VISIBLE_DEVICES=1
-nohup python deeplab_demo.py --frozenpath ~/temp/frozen_inference_graph-20868-multiscale.pb --dirslist ~/temp/gsvcities_dirs.lst --outdir ~/temp/20191221-gsvcities_polygons/ 2>&1 > ~/temp/20191221-gsvcities_wkt.log &
+""" DeepLab evaluation
 """
 
 import sys
@@ -17,8 +14,6 @@ import random
 import argparse
 import logging
 from os.path import join as pjoin
-from logging import debug, info
-
 
 from io import BytesIO
 import tarfile
@@ -30,49 +25,40 @@ from matplotlib import pyplot as plt
 import numpy as np
 from PIL import Image
 
-import tensorflow as tf
+# import tensorflow as tf
 import time
 
-class DeepLabModel(object):
-  """Class to load deeplab model and run inference."""
+from src.utils import info
 
-  INPUT_TENSOR_NAME = 'ImageTensor:0'
-  OUTPUT_TENSOR_NAME = 'SemanticPredictions:0'
-  INPUT_SIZE = 640
+##########################################################
+# class DeepLabModel(object):
+  # """Deeplab model for prediction"""
+  # INPUT_TENSOR_NAME = 'ImageTensor:0'
+  # OUTPUT_TENSOR_NAME = 'SemanticPredictions:0'
+  # INPUT_SIZE = 640
 
-  def __init__(self, frozenpath):
-    """Creates and loads pretrained deeplab model."""
-    self.graph = tf.Graph()
+  # def __init__(self, frozenpath):
+    # """Loads pretrained deeplab model"""
+    # self.graph = tf.Graph()
+    # graph_def = tf.GraphDef.FromString(open(frozenpath, 'rb').read())
 
-    graph_def = None
+    # if graph_def is None:
+      # raise RuntimeError('Cannot find inference graph in tar archive.')
 
-    file_handle  = open(frozenpath, 'rb')
-    graph_def = tf.GraphDef.FromString(file_handle.read())
+    # with self.graph.as_default():
+        # tf.import_graph_def(graph_def, name='')
 
-    if graph_def is None:
-      raise RuntimeError('Cannot find inference graph in tar archive.')
+    # self.sess = tf.Session(graph=self.graph)
 
-    with self.graph.as_default():
-      tf.import_graph_def(graph_def, name='')
+  # def predict(self, image):
+    # """Prediction on @image and return the np.array mask
+    # """
+    # batch_seg_map = self.sess.run(
+        # self.OUTPUT_TENSOR_NAME,
+        # feed_dict={self.INPUT_TENSOR_NAME: [image]})
+    # return batch_seg_map[0]
 
-    self.sess = tf.Session(graph=self.graph)
-
-  def run(self, image):
-    """Runs inference on a single image.
-
-    Args:
-      image: A PIL.Image object, raw input image.
-
-    Returns:
-      seg_map: Segmentation map of `resized_image`.
-    """
-    batch_seg_map = self.sess.run(
-        self.OUTPUT_TENSOR_NAME,
-        feed_dict={self.INPUT_TENSOR_NAME: [image]})
-    seg_map = batch_seg_map[0]
-    return seg_map
-
-
+##########################################################
 def create_pascal_label_colormap():
   """Creates a label colormap used in PASCAL VOC segmentation benchmark.
 
@@ -90,6 +76,7 @@ def create_pascal_label_colormap():
   return colormap
 
 
+##########################################################
 def label_to_color_image(label):
   """Adds color defined by the dataset colormap to the label.
 
@@ -116,6 +103,7 @@ def label_to_color_image(label):
   return colormap[label]
 
 
+##########################################################
 def vis_segmentation(image, seg_map):
   """Visualizes input image, segmentation map and overlay view."""
   plt.figure(figsize=(15, 5))
@@ -143,7 +131,7 @@ def vis_segmentation(image, seg_map):
   plt.imshow(
       FULL_COLOR_MAP[unique_labels].astype(np.uint8), interpolation='nearest')
   ax.yaxis.tick_right()
-  plt.yticks(range(len(unique_labels)), LABEL_NAMES[unique_labels])
+  plt.yticks(range(len(unique_labels)), labels[unique_labels])
   plt.xticks([], [])
   ax.tick_params(width=0.0)
   plt.grid('off')
@@ -157,6 +145,7 @@ def vis_segmentation(image, seg_map):
         # points.append(cv2point[0])
     # return points
 
+##########################################################
 def get_contours(mask_):
     epsilon = 2
     aux, _ = cv2.findContours(mask_.astype(np.uint8), cv2.RETR_EXTERNAL,
@@ -187,6 +176,7 @@ def dump_contours_to_wkt(polys, wktpath):
     with open(wktpath, 'w') as fh:
         fh.write(shapelycontours.wkt)
 
+##########################################################
 def crop_masks(im, imfilename, polys, cropdir):
     if len(polys) == 0: return
 
@@ -204,6 +194,7 @@ def crop_masks(im, imfilename, polys, cropdir):
 
         cropped = im.crop((xmin, ymin, xmax, ymax))
         cropped.save(croppath)
+
 ##########################################################
 def run_visualization(impath):
   """Inferences DeepLab model and visualizes result."""
@@ -213,22 +204,27 @@ def run_visualization(impath):
 
   vis_segmentation(resized_im, seg_map)
 
+##########################################################
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--frozenpath', required=True, help='Frozen model path')
-    parser.add_argument('--dirslist', required=True, help='List of the dirs containing the images')
-    parser.add_argument('--shuffle', action='store_true', help='Output directory')
-    parser.add_argument('--outdir', required=True, help='Output directory')
+    parser.add_argument('--imdir', required=True, help='Folder of the images')
+    parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
     args = parser.parse_args()
 
-    logging.basicConfig(format='[%(asctime)s] %(message)s',
-    datefmt='%Y%m%d %H:%M', level=logging.DEBUG)
+    if not os.path.exists(outdir): os.mkdir(outdir)
+    predict_all(args.frozenpath, imdir, args.outdir):
 
-    LABEL_NAMES = np.asarray([
-        'background', 'tag', 'frame', 'sign',
-    ])
+##########################################################
+def predict_all(modelpath, imdir, outdir):
+    """Predict using frozen @modelpath all images in @imdir and outputs
+    to @outdir
+    """
+    info(inspect.stack()[0][3] + '()')
 
-    FULL_LABEL_MAP = np.arange(len(LABEL_NAMES)).reshape(len(LABEL_NAMES), 1)
+    labels = np.asarray('background tag frame sign'.split(' '))
+
+    FULL_LABEL_MAP = np.arange(len(labels)).reshape(len(labels), 1)
     FULL_COLOR_MAP = label_to_color_image(FULL_LABEL_MAP)
 
     MODEL = DeepLabModel(args.frozenpath)
@@ -256,10 +252,6 @@ def main():
         os.makedirs(cropdir, exist_ok=True)
 
         imgs = sorted(os.listdir(imdir))
-        if args.shuffle:
-            info('Shuffling images')
-            random.shuffle(imgs)
-
         for im in imgs:
             if not im.endswith('.jpg'): continue
             # info('{}'.format(im))
@@ -287,6 +279,7 @@ def main():
 
             crop_masks(original_im, im, polys, cropdir)
 
+##########################################################
 if __name__ == "__main__":
     main()
 

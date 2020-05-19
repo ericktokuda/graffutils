@@ -1,104 +1,76 @@
 #!/usr/bin/env python3
-"""Utility functions for the graffiti project
-
-# labelanalyzer
-rm /tmp/out -rf && python src/utils.py labelanalyzer /tmp /tmp/ --outdir /tmp/out
-
-# clustering
-rm /tmp/out -rf && python src/utils.py clustering all ~/results/graffiti/20200115-features_resnet18_sample1000.csv /tmp/ --outdir /tmp/out
-
-# filterbysize
-rm /tmp/out -rf && python src/utils.py filterbysize ~/results/graffiti/20200101-deeplab/20200109-sp20180511_crops/feature/20180511-gsv_spcity/ --outdir /tmp/out                    
-
-# featureextractor
-rm /tmp/out -rf && python src/utils.py featureextractor ~/results/graffiti/20200101-deeplab/20200109-sp20180511_crops/crop/20180511-gsv_spcity --outdir /tmp/out
-
-# featuresummarizer
-rm /tmp/out -rf && python src/utils.py featuresummarizer ~/results/graffiti/20200101-deeplab/20200109-sp20180511_crops/feature/20180511-gsv_spcity/ all --outdir /tmp/out
-
-# masksgenerator
-rm /tmp/out -rf && python src/utils.py masksgenerator ~/results/graffiti/20200101-deeplab/20200109-sp20180511_crops/wkt/20180511-gsv_spcity/  /media/frodo/6TB_A/gsvcities/20180511-gsv_spcity/img --outdir /tmp/out
-
-# infomapparser
-rm /tmp/out -rf && python src/utils.py infomapparser ~/results/graffiti/20200222-citysp_infomap.clu ~/results/graffiti/20200221-citysp.graphml  ~/results/graffiti/20200209-cityspold_8003_annot_labels/labels.csv --outdir /tmp/out
-
-# labelshuffler
-rm /tmp/shuffle -rf && python src/utils.py labelshuffler ~/results/graffiti/20200209-cityspold_8003_labels_clu.csv  --outdir /tmp/shuffle
-
-# labelplotter  - generate plots for the article
-rm /tmp/foo -rf && python src/utils.py labelplotter ~/results/graffiti/20200209-cityspold_8003_labels_clu.csv ~/results/graffiti/20200222-citysp_infomap_areas.csv --outdir /tmp/foo
-
-# mapgenerator - generate a map of the counts
-rm /tmp/foo -rf && python src/utils.py mapgenerator ~/results/graffiti/20200202-types/20200221-citysp.graphml ~/results/graffiti/20200202-types/20200224-citysp_shp/ ~/results/graffiti/20200202-types/20200209-cityspold_8003_labels_clu.csv ~/results/graffiti/20200202-types/20200222-citysp_infomap.clu --outdir /tmp/foo
+""" Features clustering and export to pickle
 """
 
 import argparse
-import logging
 import time
-from os.path import join as pjoin
-from logging import debug, info
 import os
+from os.path import join as pjoin
+import inspect
+
+import sys
 import numpy as np
+import matplotlib; matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from datetime import datetime
 import pandas as pd
-import pickle as pkl
+import sys
+import h5py
+import inspect
+from datetime import datetime
 
-
-# from labelanalyzer import LabelAnalyzer
-# from clustering import Clustering
-from filterbysize import FilterBySize
-from featureextractor import FeatureExtractor
-from featuresummarizer import FeatureSummarizer
-from masksgenerator import MasksGenerator
-from deeplabanalyzer import DeeplabAnalyzer
-from labelshuffler import LabelShuffler
-from infomapparser import InfomapParser
-from labelplotter import LabelPlotter
-from mapgenerator import MapGenerator
+#############################################################
+def info(*args):
+    pref = datetime.now().strftime('[%y%m%d %H:%M:%S]')
+    print(pref, *args, file=sys.stdout)
 
 ##########################################################
-def main():
-    t0 = time.time()
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('args', nargs='*', help='1: function 2-*: function arguments')
-    parser.add_argument('--outdir', default='/tmp/', help='Output dir')
-    arguments = parser.parse_args()
+def dump_to_hdf5(x, h5path, type=float):
+    """Dump @x to @outdir/@filename
+    """
+    info(inspect.stack()[0][3] + '()')
 
-    logging.basicConfig(format='[%(asctime)s] %(message)s',
-    datefmt='%Y%m%d %H:%M', level=logging.INFO)
+    if os.path.exists(h5path): os.remove(h5path)
+    fh = h5py.File(h5path, "w")
+    dset = fh.create_dataset("data", data=x, dtype=type)
+    fh.close()
 
-    if os.path.exists(arguments.outdir):
-        info('Path {} already exists...'.format(arguments.outdir))
-    else:
-        os.mkdir(arguments.outdir)
-        # return
+##########################################################
+def analyze_deeplab_log(logpath):
+    """Parse deeplab log in an attempt to find the best iou
+    It is a bit crypt here.
+    """
+    info(inspect.stack()[0][3] + '()')
+    if not os.path.exists(outdir): os.mkdir(outdir)
+    fh = open(logpath, 'r')
+    res = []
+    while True:
+       aux = fh.readline()
+       ckpt = int(aux.replace('model.ckpt-', '').replace('.meta', ''))
+       print(ckpt)
+       aux = fh.readline()
+       idx = aux.find('class_0')
+       aux = aux[idx+12:]
+       idx = aux.find(']')
+       aux = aux[:idx]
+       iou0 = float(aux)
 
+       aux = fh.readline()
+       idx = aux.find('class_1')
+       aux = aux[idx+12:]
+       idx = aux.find(']')
+       aux = aux[:idx]
+       iou1 = float(aux)
 
-    options = dict(
-        # labelanalyzer = LabelAnalyzer,
-        # clustering = Clustering,
-        filterbysize = FilterBySize,
-        featureextractor = FeatureExtractor,
-        featuresummarizer = FeatureSummarizer,
-        deeplabanalyzer = DeeplabAnalyzer,
-        labelshuffler = LabelShuffler,
-        masksgenerator = MasksGenerator,
-        infomapparser = InfomapParser,
-        labelplotter = LabelPlotter,
-        mapgenerator = MapGenerator,
-    )
+       res.append([ckpt, iou0, iou1, (iou0+iou1)/2])
 
-    if len(arguments.args) == 0:
-        info('Please provide the function you want to call as the first argument\n'\
-             'or call this script with --help. Aborting...')
-        return
+       if ckpt == 9730: break
 
-    if arguments.args[0] in options.keys():
-        exps = options[arguments.args[0]]()
-        exps.run(arguments.args[1:], arguments.outdir)
-    else:
-        info('Please choose one among {}. Aborting...'.format(options.keys()))
+    fh.close()
 
-    info('Elapsed time:{}'.format(time.time()-t0))
-
-if __name__ == "__main__":
-    main()
+##########################################################
+def read_hdf5(h5path):
+    """Read @h5py
+    """
+    fh = h5py.File(h5path, "r")
+    return np.array(fh['data'])

@@ -17,13 +17,10 @@ from datetime import datetime
 from PIL import Image
 
 from img2vec_pytorch import Img2Vec
-import src.utils2 as utils
+from src import utils
+from utils import info
 
 HOME = os.getenv('HOME')
-#############################################################
-def info(*args):
-    pref = datetime.now().strftime('[%y%m%d %H:%M:%S]')
-    print(pref, *args, file=sys.stdout)
 
 ##########################################################
 def extract_features_all(imdir, outdir):
@@ -55,39 +52,6 @@ def format_features(ind, h5path):
     row = '{:04d},{},{},{},'.format(ind, f, lat, lon)
     row += ','.join(featstr) + '\n'
     return row
-
-##########################################################
-def concatenate_features_sample(featdir, samplesz, outpath):
-    info(inspect.stack()[0][3] + '()')
-
-    files = np.array(sorted(os.listdir(featdir)))
-
-    fh = open(pjoin(outdir, 'features.csv'), 'w')
-    fh.write('id,file,lat,lon,')
-    arr = [ 'feat{:03d}'.format(x) for x in range(512)]
-    fh.write(','.join(arr))
-    fh.write('\n')
-
-    inds = list(range(len(files)))
-    if samplesz == -1:
-        files = sorted(files)
-    else:
-        np.random.shuffle(inds)
-        inds = inds[:int(samplesize)]
-        files = files[inds]
-
-    for i, f in enumerate(files):
-        pklpath = pjoin(featdir, f)
-        if not os.path.exists(pklpath): continue
-        info('f:{}'.format(f))
-        feat = pkl.load(open(pklpath, 'rb'))
-        feat = [str(x) for x in feat]
-        lat = (f.strip().split('_')[1])
-        lon = (f.strip().split('_')[2])
-        breakpoint()
-        fh.write('{:04d},{},{},{},'.format(inds[i], os.path.splitext(f)[0], lat, lon))
-        fh.write(','.join(feat))
-        fh.write('\n')
 
 ##########################################################
 def concatenate_features_all(featdir, featpath):
