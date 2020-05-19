@@ -203,18 +203,6 @@ def run_visualization(impath):
   resized_im, seg_map = MODEL.run(original_im)
 
   vis_segmentation(resized_im, seg_map)
-
-##########################################################
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--frozenpath', required=True, help='Frozen model path')
-    parser.add_argument('--imdir', required=True, help='Folder of the images')
-    parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
-    args = parser.parse_args()
-
-    if not os.path.exists(outdir): os.mkdir(outdir)
-    predict_all(args.frozenpath, imdir, args.outdir):
-
 ##########################################################
 def predict_all(modelpath, imdir, outdir):
     """Predict using frozen @modelpath all images in @imdir and outputs
@@ -278,6 +266,50 @@ def predict_all(modelpath, imdir, outdir):
             dump_contours_to_wkt(polys, wktpath)
 
             crop_masks(original_im, im, polys, cropdir)
+
+##########################################################
+def analyze_deeplab_log(logpath):
+    """Parse deeplab log in an attempt to find the best iou
+    It is a bit crypt here.
+    """
+    info(inspect.stack()[0][3] + '()')
+    if not os.path.exists(outdir): os.mkdir(outdir)
+    fh = open(logpath, 'r')
+    res = []
+    while True:
+       aux = fh.readline()
+       ckpt = int(aux.replace('model.ckpt-', '').replace('.meta', ''))
+       print(ckpt)
+       aux = fh.readline()
+       idx = aux.find('class_0')
+       aux = aux[idx+12:]
+       idx = aux.find(']')
+       aux = aux[:idx]
+       iou0 = float(aux)
+
+       aux = fh.readline()
+       idx = aux.find('class_1')
+       aux = aux[idx+12:]
+       idx = aux.find(']')
+       aux = aux[:idx]
+       iou1 = float(aux)
+
+       res.append([ckpt, iou0, iou1, (iou0+iou1)/2])
+
+       if ckpt == 9730: break
+
+    fh.close()
+
+##########################################################
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--frozenpath', required=True, help='Frozen model path')
+    parser.add_argument('--imdir', required=True, help='Folder of the images')
+    parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
+    args = parser.parse_args()
+
+    if not os.path.exists(outdir): os.mkdir(outdir)
+    predict_all(args.frozenpath, imdir, args.outdir):
 
 ##########################################################
 if __name__ == "__main__":
