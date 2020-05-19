@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from scipy import stats
 import pandas as pd
+import geopandas as geopd
 from mpl_toolkits.mplot3d import axes3d
 
 #############################################################
@@ -80,7 +81,37 @@ def plot_hist2d(x, y, outdir):
     plt.savefig(pjoin(outdir, 'hist2d.pdf'))
 
 ##########################################################
-def plot_densities(df, xx, yy, outdir):
+def plot_density_pairwise_diff(df, xx, yy, mapx, mapy, outdir):
+    """Plot all the combinations of the differences on the densities
+    in the grid @xx, @yy
+    """
+    info(inspect.stack()[0][3] + '()')
+
+    labels = np.unique(df.label)
+    from itertools import combinations
+    combs = list(combinations(list(range(len(labels))), 2))
+
+    nrows = 1;  ncols = len(combs)
+    figscale = 4
+    fig, axs = plt.subplots(nrows, ncols, squeeze=False,
+                figsize=(ncols*figscale, nrows*figscale))
+
+
+    pdfvals = np.ndarray((len(labels), xx.shape[0], xx.shape[1]))
+    for j, l in enumerate(labels):
+        filtered = df[(df.label == int(l))]
+        pdfvals[j, :, :] = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy)
+
+    i = 0
+    for j, comb in enumerate(combs):
+        vals = pdfvals[comb[1]] - pdfvals[comb[0]]
+        axs[i, j].plot(mapx, mapy, c='dimgray')
+        axs[i, j].scatter(xx, yy, c=vals)
+
+    plt.savefig(pjoin(outdir, 'density_diff.png'))
+
+##########################################################
+def plot_densities(df, xx, yy, mapx, mapy, outdir):
     """Plot the densities in the grid @xx, @yy
     """
     info(inspect.stack()[0][3] + '()')
@@ -88,22 +119,29 @@ def plot_densities(df, xx, yy, outdir):
     annotators = np.unique(df.annotator)
     labels = np.unique(df.label)
 
-    nrows = len(annotators);  ncols = len(labels)
+    nrows = len(annotators);  ncols = len(labels) + 1
     figscale = 4
     fig, axs = plt.subplots(nrows, ncols, squeeze=False,
                 figsize=(ncols*figscale, nrows*figscale))
+
+    pdfvals = np.ndarray((len(annotators), len(labels), xx.shape[0], xx.shape[1]))
+    for i, anno in enumerate(annotators):
+        for j, l in enumerate(labels):
+            filtered = df[(df.annotator == anno) & (df.label == int(l))]
+            pdfvals[i, j, :, :] = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy)
+
     for i, anno in enumerate(annotators):
         axs[i, 0].set_ylabel('Annotator {}'.format(i))
+        meanpdf = np.mean(pdfvals[i], axis=0)
+        axs[i, 0].scatter(xx, yy, c=meanpdf)
+        if i == 0: axs[i, 0].set_title('Mean pdf')
         for j, l in enumerate(labels):
-            if i == 0: axs[i, j].set_title('Type {}'.format(l))
-            filtered = df[(df.annotator == anno) & (df.label == int(l))]
-            f = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy)
-            axs[i, j].scatter(xx, yy, c=f)
+            jj = j + 1
+            if i == 0: axs[i, jj].set_title('Type {}'.format(l))
+            vals = pdfvals[i][j] - meanpdf
+            axs[i, jj].plot(mapx, mapy, c='dimgray')
+            axs[i, jj].scatter(xx, yy, c=vals)
 
-    # gdf = gpd.read_file(shppath)
-    # shapefile = gdf.geometry.values[0]
-    # xs, ys = shapefile.exterior.xy
-    # ax[0, 0].plot(xs, ys, c='dimgray')
     plt.savefig(pjoin(outdir, 'density.png'))
 
 ##########################################################
@@ -123,8 +161,18 @@ def create_meshgrid(x, y, relmargin=.1):
     marginy = (max(y) - min(y)) * relmargin
 
     xrange = [np.min(x) - marginx, np.max(x) + marginx]
-    yrange = [np.min(y) - marginy - .1, np.max(y) + marginy]
+    # yrange = [np.min(y) - marginy, np.max(y) + marginy] 
+    yrange = [np.min(y) - marginy - .15, np.max(y) + marginy] 
     return np.mgrid[xrange[0]:xrange[1]:100j, yrange[0]:yrange[1]:100j]
+
+#############################################################
+def get_shp_points(shppath):
+    """Get points from @shppath and returns list of points, x and y
+    """
+    info(inspect.stack()[0][3] + '()')
+    geodf = geopd.read_file(shppath)
+    shapefile = geodf.geometry.values[0]
+    return shapefile.exterior.xy
 
 #############################################################
 def process(clusterlabelspath, outdir):
@@ -140,7 +188,10 @@ def process(clusterlabelspath, outdir):
     # plot_surface(f, df.x, df.y, xx, yy, outdir)
     # plot_wireframe(f, df.x, df.y, xx, yy, outdir)
 
-    plot_densities(df, xx, yy, outdir)
+    shppath = '/home/dufresne/temp/20200202-types/20200224-citysp_shp/'
+    mapx, mapy = get_shp_points(shppath)
+    plot_densities(df, xx, yy, mapx, mapy, outdir)
+    plot_density_pairwise_diff(df, xx, yy, mapx, mapy, outdir)
     
 ##########################################################
 def main():
