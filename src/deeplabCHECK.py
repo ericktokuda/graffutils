@@ -25,38 +25,38 @@ from matplotlib import pyplot as plt
 import numpy as np
 from PIL import Image
 
-# import tensorflow as tf
+import tensorflow as tf
 import time
 
 from src.utils import info
 
-##########################################################
-# class DeepLabModel(object):
-  # """Deeplab model for prediction"""
-  # INPUT_TENSOR_NAME = 'ImageTensor:0'
-  # OUTPUT_TENSOR_NAME = 'SemanticPredictions:0'
-  # INPUT_SIZE = 640
+#########################################################
+class DeepLabModel(object):
+  """Deeplab model for prediction"""
+  INPUT_TENSOR_NAME = 'ImageTensor:0'
+  OUTPUT_TENSOR_NAME = 'SemanticPredictions:0'
+  INPUT_SIZE = 640
 
-  # def __init__(self, frozenpath):
-    # """Loads pretrained deeplab model"""
-    # self.graph = tf.Graph()
-    # graph_def = tf.GraphDef.FromString(open(frozenpath, 'rb').read())
+  def __init__(self, frozenpath):
+    """Loads pretrained deeplab model"""
+    self.graph = tf.Graph()
+    graph_def = tf.GraphDef.FromString(open(frozenpath, 'rb').read())
 
-    # if graph_def is None:
-      # raise RuntimeError('Cannot find inference graph in tar archive.')
+    if graph_def is None:
+      raise RuntimeError('Cannot find inference graph in tar archive.')
 
-    # with self.graph.as_default():
-        # tf.import_graph_def(graph_def, name='')
+    with self.graph.as_default():
+        tf.import_graph_def(graph_def, name='')
 
-    # self.sess = tf.Session(graph=self.graph)
+    self.sess = tf.Session(graph=self.graph)
 
-  # def predict(self, image):
-    # """Prediction on @image and return the np.array mask
-    # """
-    # batch_seg_map = self.sess.run(
-        # self.OUTPUT_TENSOR_NAME,
-        # feed_dict={self.INPUT_TENSOR_NAME: [image]})
-    # return batch_seg_map[0]
+  def predict(self, image):
+    """Prediction on @image and return the np.array mask
+    """
+    batch_seg_map = self.sess.run(
+        self.OUTPUT_TENSOR_NAME,
+        feed_dict={self.INPUT_TENSOR_NAME: [image]})
+    return batch_seg_map[0]
 
 ##########################################################
 def create_pascal_label_colormap():
@@ -309,7 +309,7 @@ def main():
     args = parser.parse_args()
 
     if not os.path.exists(outdir): os.mkdir(outdir)
-    predict_all(args.frozenpath, imdir, args.outdir):
+    predict_all(args.frozenpath, imdir, args.outdir)
 
 ##########################################################
 if __name__ == "__main__":
