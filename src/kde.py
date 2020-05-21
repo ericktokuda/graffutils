@@ -14,6 +14,8 @@ from itertools import product
 import matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from datetime import datetime
+import shutil
+
 from scipy import stats
 import pandas as pd
 import geopandas as geopd
@@ -188,6 +190,21 @@ def plot_density_pairwise_diff(df, xx, yy, mapx, mapy, outdir):
     plt.tight_layout(2)
     plt.savefig(pjoin(outdir, 'density_pairwisediff.png'))
 
+            # copy_imgs(nearby, imdir, imoutdir)
+##########################################################
+def copy_imgs(df, indir, outdir):
+    """
+    Copy images from  dataframe @df from @indir to @outdir
+    """
+    info(inspect.stack()[0][3] + '()')
+    if not os.path.exists(outdir): os.makedirs(outdir)
+
+    for i, row in df.iterrows():
+        inpath = pjoin(indir, row.filename)
+        outpath = pjoin(outdir, row.filename)
+        shutil.copy(inpath, outpath)
+    
+
 ##########################################################
 def plot_types_inside_region(dforig, c0, radius, mapx, mapy, outdir):
     """Plot the types inside region
@@ -213,6 +230,11 @@ def plot_types_inside_region(dforig, c0, radius, mapx, mapy, outdir):
             nearby = df[(df.annotator == anno) & (df.label == l)]
             axs[i, j].scatter(nearby.x, nearby.y, label=l, s=4,
                     alpha=.7, linewidths=0)
+
+            imdir = '/media/dufresne/mypassport500G/gsvcities/20180511-gsv_spcity/img/'
+            imoutdir = pjoin(outdir, anno, str(l))
+            copy_imgs(nearby, imdir, imoutdir)
+
 
     plt.legend()
     plt.tight_layout(2)
@@ -259,6 +281,10 @@ def get_points_inside_region(df, c0, radius):
     return df.iloc[inds]
     
 ##########################################################
+def filename_from_coords(x, y, heading, ext='jpg'):
+    return '_{}_{}_{}.{}'.format(y, x, heading, ext)
+
+##########################################################
 def main():
     info(inspect.stack()[0][3] + '()')
     t0 = time.time()
@@ -275,6 +301,7 @@ def main():
 
     df = pd.read_csv(args.clusterlabels)
     xx, yy = create_meshgrid(df.x, df.y, relmargin=.1)
+    mapx, mapy = get_shp_points(args.shppath)
 
     # f = compute_pdf_over_grid(df.x, df.y, xx, yy)
     # plt.scatter(df.x, df.y); plt.savefig(pjoin(args.outdir, 'points.pdf'))
@@ -284,7 +311,6 @@ def main():
     # plot_surface(f, df.x, df.y, xx, yy, args.outdir)
     # plot_wireframe(f, df.x, df.y, xx, yy, args.outdir)
 
-    mapx, mapy = get_shp_points(args.shppath)
     plot_density_real(df, xx, yy, mapx, mapy, args.outdir)
     plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
     plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
