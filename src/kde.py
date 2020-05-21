@@ -18,6 +18,7 @@ from scipy import stats
 import pandas as pd
 import geopandas as geopd
 from mpl_toolkits.mplot3d import axes3d
+from scipy.spatial import cKDTree
 
 #############################################################
 def info(*args):
@@ -110,6 +111,8 @@ def plot_density_real(df, xx, yy, mapx, mapy, outdir):
             vals = pdfvals[i][j]
             axs[i, j].plot(mapx, mapy, c='dimgray')
             im = axs[i, j].scatter(xx, yy, c=vals)
+            # axs[i, j].scatter([-46.62], [-23.57], c='k')
+
             # fig.colorbar(im, ax=axs[i, j])
 
     plt.tight_layout(2)
@@ -186,6 +189,36 @@ def plot_density_pairwise_diff(df, xx, yy, mapx, mapy, outdir):
     plt.savefig(pjoin(outdir, 'density_pairwisediff.png'))
 
 ##########################################################
+def plot_types_inside_region(dforig, c0, radius, mapx, mapy, outdir):
+    """Plot the types inside region
+    """
+    info(inspect.stack()[0][3] + '()')
+
+    df = get_points_inside_region(dforig, c0, radius)
+
+    labels = np.unique(dforig.label)
+    annotators = np.unique(dforig.annotator)
+
+    nrows = 1;  ncols = 2
+    figscale = 4
+    fig, axs = plt.subplots(nrows, ncols, squeeze=False,
+                figsize=(ncols*figscale, nrows*figscale))
+
+    i = 0
+    for j, anno in enumerate(annotators):
+        axs[i, j].set_title('Annotator {}'.format(j))
+        axs[i, j].plot(mapx, mapy, c='dimgray')
+
+        for k, l in enumerate(labels):
+            nearby = df[(df.annotator == anno) & (df.label == l)]
+            axs[i, j].scatter(nearby.x, nearby.y, label=l, s=4,
+                    alpha=.7, linewidths=0)
+
+    plt.legend()
+    plt.tight_layout(2)
+    plt.savefig(pjoin(outdir, 'types_region.png'))
+
+##########################################################
 def compute_pdf_over_grid(x, y, xx, yy):
     positions = np.vstack([xx.ravel(), yy.ravel()])
     values = np.vstack([x, y])
@@ -215,24 +248,15 @@ def get_shp_points(shppath):
     shapefile = geodf.geometry.values[0]
     return shapefile.exterior.xy
 
-#############################################################
-def process(clusterlabelspath, shppath, outdir):
+##########################################################
+def get_points_inside_region(df, c0, radius):
+    """Get points from @df within circle of center @c0 and @radius
+    """
     info(inspect.stack()[0][3] + '()')
-    df = pd.read_csv(clusterlabelspath)
-    xx, yy = create_meshgrid(df.x, df.y, relmargin=.1)
-
-    # f = compute_pdf_over_grid(df.x, df.y, xx, yy)
-    # plt.scatter(df.x, df.y); plt.savefig(pjoin(outdir, 'points.pdf'))
-    # plot_hist2d(df.x, df.y, outdir)
-    # plot_surface(f, df.x, df.y, xx, yy, outdir)
-    # plot_contours(f, df.x, df.y, xx, yy, outdir)
-    # plot_surface(f, df.x, df.y, xx, yy, outdir)
-    # plot_wireframe(f, df.x, df.y, xx, yy, outdir)
-
-    mapx, mapy = get_shp_points(shppath)
-    plot_density_real(df, xx, yy, mapx, mapy, outdir)
-    plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir)
-    plot_density_pairwise_diff(df, xx, yy, mapx, mapy, outdir)
+    coords = df[['x', 'y']].values
+    kdtree = cKDTree(coords)
+    inds = kdtree.query_ball_point(c0, radius)
+    return df.iloc[inds]
     
 ##########################################################
 def main():
@@ -248,7 +272,26 @@ def main():
     if not os.path.isdir(args.outdir): os.mkdir(args.outdir)
 
     plt.rcParams['image.cmap'] = 'Blues'
-    process(args.clusterlabels, args.shppath, args.outdir)
+
+    df = pd.read_csv(args.clusterlabels)
+    xx, yy = create_meshgrid(df.x, df.y, relmargin=.1)
+
+    # f = compute_pdf_over_grid(df.x, df.y, xx, yy)
+    # plt.scatter(df.x, df.y); plt.savefig(pjoin(args.outdir, 'points.pdf'))
+    # plot_hist2d(df.x, df.y, args.outdir)
+    # plot_surface(f, df.x, df.y, xx, yy, args.outdir)
+    # plot_contours(f, df.x, df.y, xx, yy, args.outdir)
+    # plot_surface(f, df.x, df.y, xx, yy, args.outdir)
+    # plot_wireframe(f, df.x, df.y, xx, yy, args.outdir)
+
+    mapx, mapy = get_shp_points(args.shppath)
+    plot_density_real(df, xx, yy, mapx, mapy, args.outdir)
+    plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
+    plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
+
+    c0 = [-46.62, -23.57]
+    radius = .05
+    plot_types_inside_region(df, c0, radius, mapx, mapy, args.outdir)
 
     info('Elapsed time:{}'.format(time.time()-t0))
 
