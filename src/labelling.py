@@ -12,21 +12,24 @@ import numpy as np
 import matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
+import matplotlib.collections as mc
+import matplotlib.patches as mpatches
 import pandas as pd
 from scipy.spatial import cKDTree
 import scipy.stats as stats
 import igraph
+import geopandas as geopd
 
 # from src import utils
 from src.utils import info
 
 ##########################################################
 class MapGenerator:
-    def __init__(self, graphmlpath, shppath, labelspath, clupath, outdir):
+    def __init__(self, graphmlpath, shppath, infomapoutpath, clulabelspath, outdir):
         # Run this after running:
         # ./Infomap ~/temp/citysp.net /tmp/ --directed --clu --tree --bftree --map
         np.random.seed(0)
-        df = pd.read_csv(labelspath, index_col='id')
+        df = pd.read_csv(clulabelspath, index_col='id')
         totalrows = len(df)
 
         g = igraph.Graph.Read(graphmlpath)
@@ -34,7 +37,7 @@ class MapGenerator:
         g.to_undirected()
         coords = [(float(x), -float(y)) for x, y in zip(g.vs['x'], g.vs['y'])]
 
-        fh = open(clupath)
+        fh = open(infomapoutpath)
         lines = fh.read().strip().split('\n')
 
         aux = np.zeros(g.vcount())
@@ -43,6 +46,7 @@ class MapGenerator:
             aux[int(arr[0])-1] = int(arr[1])
         g.vs['clustid'] = aux
         fh.close()
+
         info('Clusters found in infomap: {}'.format(np.unique(g.vs['clustid'])))
 
         for attr in ['ref', 'highway', 'osmid', 'id']:
@@ -52,16 +56,17 @@ class MapGenerator:
 
         fig, ax = plt.subplots(1, 2, figsize=(15, 12), squeeze=False) # Plot contour
 
-        gdf = gpd.read_file(shppath)
-        shapefile = gdf.geometry.values[0]
+        geodf = geopd.read_file(shppath)
+        shapefile = geodf.geometry.values[0]
+        
         xs, ys = shapefile.exterior.xy
         ax[0, 0].plot(xs, ys, c='dimgray')
 
-        labelsdf = pd.read_csv(labelspath)
-        clusters = np.unique(labelsdf.cluster)
+        # labelsdf = pd.read_csv(clulabelspath)
+        clusters = np.unique(df.cluster)
         clusters_str = ['C{}'.format(cl) for cl in clusters]
         nclusters = len(clusters)
-        labels = np.unique(labelsdf.label)
+        labels = np.unique(df.label)
         nlabels = len(labels)
 
         markers = ['$A$', '$B$', '$C$']
@@ -73,7 +78,7 @@ class MapGenerator:
                   # zip(markers, ss, edgecolours)]
 
         for i, l in enumerate(labels):
-            data = labelsdf[labelsdf.label == l]
+            data = df[df.label == l]
             ax[0, 0].scatter(data.x, data.y, c=edgecolours[i],
                              label='Type ' + markers[i],
                              alpha=0.6,
@@ -130,8 +135,8 @@ class MapGenerator:
         ax[0, 1].add_collection(lc)
         ax[0, 1].autoscale()
 
-        gdf = gpd.read_file(shppath)
-        shapefile = gdf.geometry.values[0]
+        geodf = geopd.read_file(shppath)
+        shapefile = geodf.geometry.values[0]
         xs, ys = shapefile.exterior.xy
         ax[0, 1].plot(xs, ys, c='dimgray')
         
@@ -148,12 +153,10 @@ class MapGenerator:
                         fontsize='xx-large', title_fontsize='xx-large')
 
         extent = ax[0, 0].get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-        fig.savefig(pjoin(outdir, 'map_types.png'), bbox_inches=extent.expanded(1.0, 1.0))
+        fig.savefig(pjoin(outdir, 'map_types.pdf'), bbox_inches=extent.expanded(1.0, 1.0))
 
         extent = ax[0, 1].get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-        fig.savefig(pjoin(outdir, 'map_comm.png'), bbox_inches=extent.expanded(1.0, 1.0))
-
-        plt.savefig(pjoin(outdir, 'maps.png'))
+        fig.savefig(pjoin(outdir, 'map_comm.pdf'), bbox_inches=extent.expanded(1.0, 1.0))
 
 ##########################################################
 def plot_cluster_labels(clulabelspath, cluareaspath, outdir):
@@ -204,6 +207,8 @@ def plot_cluster_labels(clulabelspath, cluareaspath, outdir):
         for j, l in enumerate(labels):
             clustersums[i, j] = len(aux[aux.label == l])
 
+    info('clustersums:{}'.format(np.sum(clustersums, axis=1)))
+    
     labelsmap = {1: 'A', 2: 'B', 3: 'C'}
     for i, l in enumerate(labels):
         data = df[df.label == l]
@@ -317,8 +322,9 @@ def count_shuffled_labels_per_region(dforig, clusters, labels, cluids, nrealizat
 
     for i in range(nrealizations):
         df = dforig.copy()
-        newlabels = df.label.copy()
+        newlabels = df.label.copy().values
         np.random.shuffle(newlabels)
+        
         df['label'] = newlabels
         counts_perm[i, :, :] = count_labels_per_region(df, clusters, labels, cluids)
     return counts_perm
@@ -339,7 +345,8 @@ def shuffle_labels(labelspath, outdir):
 
     cluids = {}
     for i in range(nclusters):
-        cluids[i] = df[df.cluster == clusters[i]].index
+        # cluids[i] = df[df.cluster == clusters[i]].index
+        cluids[i] = np.where(df.cluster.values == clusters[i])[0]
 
     counts_orig = count_labels_per_region(df, clusters, labels, cluids)
     counts_perm = count_shuffled_labels_per_region(df, clusters, labels,
@@ -456,9 +463,12 @@ def parse_infomap_output(graphmlpath, infomapout, labelspath, outdir):
     pd.set_option("display.precision", 8)
 
     coords_objs = np.zeros((len(objsdf), 2))
-    for idx, row in objsdf.iterrows():
-        coords_objs[idx, 0] = row.x
-        coords_objs[idx, 1] = row.y
+    
+    i = 0
+    for _, row in objsdf.iterrows():
+        coords_objs[i, 0] = row.x
+        coords_objs[i, 1] = row.y
+        i += 1
 
     coords_nodes = np.array([g.vs['x'], g.vs['y']]).T
 
@@ -481,15 +491,15 @@ def main():
     # summarize_annotations(args.annotdir, args.outdir)
     graphmlpath = '/home/dufresne/temp/20200202-types/20200221-citysp.graphml'
     infomapout = '/home/dufresne/temp/20200202-types/20200222-citysp_infomap.clu'
-    labelspath = '/home/dufresne/temp/20200202-types/20200209-cityspold_8003_labels_clu.csv'
-    clulabelspath = '/home/dufresne/temp/20200202-types/20200209-cityspold_8003_labels_clu.csv'
+    # clulabelspath = '/home/dufresne/temp/20200202-types/20200209-cityspold_8003_labels_clu.csv'
+    clulabelspath = '/home/dufresne/temp/20200202-types/20200514-combine_me_he/clusters_eric_henrique.csv'
     cluareaspath = '/home/dufresne/temp/20200202-types/20200222-citysp_infomap_areas.csv'
     shppath = '/home/dufresne/temp/20200202-types/20200224-citysp_shp/'
 
-    # parse_infomap_output(graphmlpath, infomapout, labelspath, args.outdir)
-    # shuffle_labels(labelspath, args.outdir)
+    # parse_infomap_output(graphmlpath, infomapout, clulabelspath, args.outdir)
+    # shuffle_labels(clulabelspath, args.outdir)
     # plot_cluster_labels(clulabelspath, cluareaspath, args.outdir)
-    MapGenerator(graphmlpath, shppath, labelspath, clupath, outdir)
+    MapGenerator(graphmlpath, shppath, infomapout, clulabelspath, args.outdir)
 
     info('Elapsed time:{}'.format(time.time()-t0))
 
