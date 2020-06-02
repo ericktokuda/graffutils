@@ -129,6 +129,7 @@ def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir):
     annotators = np.unique(df.annotator)
     labels = np.unique(df.label)
 
+    grafftypesstr = ['A', 'B', 'C']
     nrows = len(annotators);  ncols = len(labels) + 1
     figscale = 4
     fig, axs = plt.subplots(nrows, ncols, squeeze=False,
@@ -148,14 +149,14 @@ def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir):
         if i == 0: axs[i, 0].set_title('Mean pdf')
         for j, l in enumerate(labels):
             jj = j + 1
-            if i == 0: axs[i, jj].set_title('Type {}'.format(l))
+            if i == 0: axs[i, jj].set_title('Type {}'.format(grafftypesstr[j]))
             vals = pdfvals[i][j] - meanpdf
             axs[i, jj].plot(mapx, mapy, c='dimgray')
             im = axs[i, jj].scatter(xx, yy, c=vals)
             # fig.colorbar(im, ax=axs[i, jj])
 
     plt.tight_layout(2)
-    plt.savefig(pjoin(outdir, 'density_difftomean.png'))
+    plt.savefig(pjoin(outdir, 'density_difftomean.pdf'))
 
 ##########################################################
 def plot_density_pairwise_diff(df, xx, yy, mapx, mapy, outdir):
@@ -226,19 +227,22 @@ def plot_types_inside_region(dforig, c0, radius, mapx, mapy, outdir):
         axs[i, j].set_title('Annotator {}'.format(j))
         axs[i, j].plot(mapx, mapy, c='dimgray')
 
+        info('n ({}):{}'. \
+                format(anno, len(df[df.annotator == anno])))
         for k, l in enumerate(labels):
             nearby = df[(df.annotator == anno) & (df.label == l)]
-            axs[i, j].scatter(nearby.x, nearby.y, label=l, s=4,
+            
+            axs[i, j].scatter(nearby.x, nearby.y, label=l, s=6,
                     alpha=.7, linewidths=0)
 
-            imdir = '/media/dufresne/mypassport500G/gsvcities/20180511-gsv_spcity/img/'
-            imoutdir = pjoin(outdir, anno, str(l))
-            copy_imgs(nearby, imdir, imoutdir)
+            # imdir = '/media/dufresne/mypassport500G/gsvcities/20180511-gsv_spcity/img/'
+            # imoutdir = pjoin(outdir, anno, str(l))
+            # copy_imgs(nearby, imdir, imoutdir)
 
 
     plt.legend()
     plt.tight_layout(2)
-    plt.savefig(pjoin(outdir, 'types_region.png'))
+    plt.savefig(pjoin(outdir, 'types_region.pdf'))
 
 ##########################################################
 def compute_pdf_over_grid(x, y, xx, yy):
@@ -311,11 +315,13 @@ def main():
     # plot_surface(f, df.x, df.y, xx, yy, args.outdir)
     # plot_wireframe(f, df.x, df.y, xx, yy, args.outdir)
 
-    plot_density_real(df, xx, yy, mapx, mapy, args.outdir)
-    plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
-    plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
+    # plot_density_real(df, xx, yy, mapx, mapy, args.outdir)
+    # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
+    # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
 
-    c0 = [-46.62, -23.57]
+    # c0 = [-46.62, -23.57]
+    # c0 = [-46.45, -23.52]
+    c0 = [-46.69, -23.55]
     radius = .05
     plot_types_inside_region(df, c0, radius, mapx, mapy, args.outdir)
 
