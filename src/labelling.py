@@ -242,7 +242,6 @@ def plot_cluster_labels(clulabelspath, cluareaspath, outdir):
         def autolabel(rects, ys):
             for idx, rect in enumerate(rects):
                 height = rect.get_height()
-                # print(rect.get_x(), height)
                 ax[0, i].text(rect.get_width()-0.05,
                               rect.get_y() + rect.get_height()/2.-0.18,
                               '{:.2f}'.format(ys[idx]), color='white',
@@ -403,14 +402,33 @@ def plot_shuffle_distrib_and_orig(counts_orig, counts_perm, nclusters,
     print(nperregion)
     plt.savefig(pjoin(outdir, 'counts_shuffled_norm.pdf'))
 
-#############################################################
-def summarize_annotations(annotdir, outdir):
-    """Summarize @annotdir csv annotations in .txt format and output
-    summary to @outdir
+##########################################################
+def compile_lists(listsdir, labelspath):
+    """Compile lists (.lst) in @listdir
     """
     info(inspect.stack()[0][3] + '()')
-    if not os.path.exists(outdir): os.mkdir(outdir)
+    files = sorted(os.listdir(listsdir))
 
+    cols = 'img,x,y,label'.split(',')
+    data = []
+    for f in files:
+        if not f.endswith('.lst'): continue
+        label = int(f.replace('.lst', '').split('_')[1])
+        lines = open(pjoin(listsdir, f)).read().strip().splitlines()
+        for l in lines:
+            id = l.replace('.jpg', '')
+            _, y, x, heading = id.split('_')
+            data.append([l, x, y, label])
+    
+    df = pd.DataFrame(data, columns=cols)
+    df.to_csv(labelspath, index_label='id',)
+
+#############################################################
+def summarize_annotations(annotdir, labelspath):
+    """Summarize @annotdir csv annotations in .txt format and output
+    summary to @labelspath
+    """
+    info(inspect.stack()[0][3] + '()')
     files = sorted(os.listdir(annotdir))
 
     labels = '1 2 3'.split(' ')
@@ -429,32 +447,15 @@ def summarize_annotations(annotdir, outdir):
             data.append([img, x, y, l])
 
     df = pd.DataFrame(data, columns=cols)
-    df.to_csv(pjoin(outdir, 'labels.csv'), index_label='id',)
-
-    for l in labels: # open
-        listpath = os.path.join(outdir, 'label_{}.lst'.format(l))
-        df[df.label == l].to_csv(listpath, columns=['img'], index=False)
-
-    cmd = '# export PREV=${{PWD}} && for I in {}; '\
-        'do mkdir {}/label_${{I}} -p && '\
-        'cd {} && '\
-        'xargs --arg-file {}/label_${{I}}.lst '\
-        'cp --target-directory="{}/label_${{I}}/"; done && '\
-        'cd ${{PREV}}'. \
-        format(' '.join(labels), outdir, '<IMDIR>', outdir, outdir)
-    info('# If you want to copy the images, replace <IMDIR> and run:')
-    info(cmd)
+    df.to_csv(labelspath, index_label='id',)
 
 ##########################################################
-def parse_infomap_output(graphmlpath, infomapout, labelspath, outdir):
+def parse_infomap_output(graphmlpath, infomapout, labelspath, outpath):
     """Find enclosing community given by @infomapout of each node in @graphml
     """
     info(inspect.stack()[0][3] + '()')
 
-    outpath = pjoin(outdir, 'clusters.csv')
-
     g = igraph.Graph.Read(graphmlpath)
-
     cludf = pd.read_csv(infomapout, sep=' ', skiprows=[0, 1],
                      names=['id', 'cluster','flow']) # load graph clusters
     cludf = cludf.sort_values(by=['id'], inplace=False)
@@ -482,21 +483,28 @@ def main():
     info(inspect.stack()[0][3] + '()')
     t0 = time.time()
     parser = argparse.ArgumentParser(description=__doc__)
-    # parser.add_argument('--annotdir', required=True, help='Annotations directory')
     parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
     args = parser.parse_args()
 
     if not os.path.isdir(args.outdir): os.mkdir(args.outdir)
 
-    # summarize_annotations(args.annotdir, args.outdir)
-    graphmlpath = '/home/dufresne/temp/20200202-types/20200221-citysp.graphml'
-    infomapout = '/home/dufresne/temp/20200202-types/20200222-citysp_infomap.clu'
-    # clulabelspath = '/home/dufresne/temp/20200202-types/20200209-cityspold_8003_labels_clu.csv'
-    clulabelspath = '/home/dufresne/temp/20200202-types/20200514-combine_me_he/clusters_eric_henrique.csv'
-    cluareaspath = '/home/dufresne/temp/20200202-types/20200222-citysp_infomap_areas.csv'
-    shppath = '/home/dufresne/temp/20200202-types/20200224-citysp_shp/'
+    annotdir = './data/20200202-types/20200209-8003_annot/'
+    graphmlpath = './data/20200202-types/sp.graphml'
+    clupath = './data/20200202-types/20200222-infomap.clu'
+    shppath = './data/20200202-types/20200224-shp/'
 
-    # parse_infomap_output(graphmlpath, infomapout, clulabelspath, args.outdir)
+    outlabels = pjoin(args.outdir, 'labels.csv')
+    outlabelsclu = pjoin(args.outdir, 'labels_and_clu.csv')
+
+    compile_lists('/tmp/', '/tmp/compilelist.csv')
+    return
+# def compile_lists(listsdir, labelspath):
+    summarize_annotations(annotdir, outlabels)
+    compile_annot_lists(listpaths, outlabels)
+    parse_infomap_output(graphmlpath, clupath, outlabels, outlabelsclu)
+    return
+    # cluareaspath = '/home/dufresne/temp/20200202-types/20200222-infomap_areas.csv'
+    # clulabelspath = HOME + '/temp/20200202-types/20200514-combine_me_he/clusters_eric_henrique.csv'
     # shuffle_labels(clulabelspath, args.outdir)
     # plot_cluster_labels(clulabelspath, cluareaspath, args.outdir)
     MapGenerator(graphmlpath, shppath, infomapout, clulabelspath, args.outdir)
