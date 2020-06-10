@@ -450,7 +450,7 @@ def summarize_annotations(annotdir, labelspath):
     df.to_csv(labelspath, index_label='id',)
 
 ##########################################################
-def parse_infomap_output(graphmlpath, infomapout, labelspath, outpath):
+def parse_infomap_output(graphmlpath, infomapout, labelspath, annotator, outpath):
     """Find enclosing community given by @infomapout of each node in @graphml
     """
     info(inspect.stack()[0][3] + '()')
@@ -476,7 +476,29 @@ def parse_infomap_output(graphmlpath, infomapout, labelspath, outpath):
     kdtree = cKDTree(coords_nodes)
     dists, inds = kdtree.query(coords_objs)
     objsdf['cluster'] = np.array(cludf.cluster.tolist())[inds]
+    objsdf['annotator'] = annotator
     objsdf.to_csv(outpath)
+
+##########################################################
+def convert_csv_to_annotdir(labelsclu, annotator, outdir):
+    """Convert dataframe in @labelsclu from @annotator to txt format in @outdir
+    """
+    info(inspect.stack()[0][3] + '()')
+    df = pd.read_csv(labelsclu)
+    labels = np.unique(df.label)
+    labeldir = pjoin(outdir, 'annot')
+    if not os.path.isdir(labeldir): os.mkdir(labeldir)
+
+    filtered = df[(df.annotator == annotator)]
+    imgs = np.unique(filtered.img)
+
+    for im in imgs:
+        aux = filtered[filtered.img == im]
+        mylabels = sorted(np.array(list(set(aux.label))).astype(str))
+        if '1' in mylabels and len(mylabels) == 1: print(im)
+        mylabelsstr = ','.join(mylabels)
+        annotpath = pjoin(labeldir, im.replace('.jpg', '.txt'))
+        open(pjoin(labeldir, annotpath), 'w').write(mylabelsstr)
 
 ##########################################################
 def main():
@@ -495,19 +517,12 @@ def main():
 
     outlabels = pjoin(args.outdir, 'labels.csv')
     outlabelsclu = pjoin(args.outdir, 'labels_and_clu.csv')
+    annotator = 'er'
 
-    compile_lists('/tmp/', '/tmp/compilelist.csv')
-    return
-# def compile_lists(listsdir, labelspath):
     summarize_annotations(annotdir, outlabels)
-    compile_annot_lists(listpaths, outlabels)
-    parse_infomap_output(graphmlpath, clupath, outlabels, outlabelsclu)
-    return
-    # cluareaspath = '/home/dufresne/temp/20200202-types/20200222-infomap_areas.csv'
-    # clulabelspath = HOME + '/temp/20200202-types/20200514-combine_me_he/clusters_eric_henrique.csv'
-    # shuffle_labels(clulabelspath, args.outdir)
-    # plot_cluster_labels(clulabelspath, cluareaspath, args.outdir)
-    MapGenerator(graphmlpath, shppath, infomapout, clulabelspath, args.outdir)
+    parse_infomap_output(graphmlpath, clupath, '/tmp/out/labels_me.csv',
+            annotator, outlabelsclu)
+    # MapGenerator(graphmlpath, shppath, clupath, outlabelsclu, args.outdir)
 
     info('Elapsed time:{}'.format(time.time()-t0))
 

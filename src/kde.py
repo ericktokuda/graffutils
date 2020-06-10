@@ -194,8 +194,7 @@ def plot_density_pairwise_diff(df, xx, yy, mapx, mapy, outdir):
             # copy_imgs(nearby, imdir, imoutdir)
 ##########################################################
 def copy_imgs(df, indir, outdir):
-    """
-    Copy images from  dataframe @df from @indir to @outdir
+    """ Copy images from  dataframe @df from @indir to @outdir
     """
     info(inspect.stack()[0][3] + '()')
     if not os.path.exists(outdir): os.makedirs(outdir)
@@ -235,11 +234,6 @@ def plot_types_inside_region(dforig, c0, radius, mapx, mapy, outdir):
             axs[i, j].scatter(nearby.x, nearby.y, label=l, s=6,
                     alpha=.7, linewidths=0)
 
-            # imdir = '/media/dufresne/mypassport500G/gsvcities/20180511-gsv_spcity/img/'
-            # imoutdir = pjoin(outdir, anno, str(l))
-            # copy_imgs(nearby, imdir, imoutdir)
-
-
     plt.legend()
     plt.tight_layout(2)
     plt.savefig(pjoin(outdir, 'types_region.pdf'))
@@ -257,6 +251,7 @@ def create_meshgrid(x, y, relmargin=.1):
     Receives  and returns a ret
     """
     info(inspect.stack()[0][3] + '()')
+
     marginx = (max(x) - min(x)) * relmargin
     marginy = (max(y) - min(y)) * relmargin
 
@@ -270,6 +265,7 @@ def get_shp_points(shppath):
     """Get points from @shppath and returns list of points, x and y
     """
     info(inspect.stack()[0][3] + '()')
+
     geodf = geopd.read_file(shppath)
     shapefile = geodf.geometry.values[0]
     return shapefile.exterior.xy
@@ -315,16 +311,9 @@ def main():
     # plot_surface(f, df.x, df.y, xx, yy, args.outdir)
     # plot_wireframe(f, df.x, df.y, xx, yy, args.outdir)
 
-    # plot_density_real(df, xx, yy, mapx, mapy, args.outdir)
-    # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
-    # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
-
-    # c0 = [-46.62, -23.57]
-    # c0 = [-46.45, -23.52]
-    c0 = [-46.69, -23.55]
-    radius = .05
-    plot_types_inside_region(df, c0, radius, mapx, mapy, args.outdir)
-
+    plot_density_real(df, xx, yy, mapx, mapy, args.outdir)
+    plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
+    plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
     info('Elapsed time:{}'.format(time.time()-t0))
 
 ##########################################################
