@@ -86,7 +86,7 @@ def plot_hist2d(x, y, outdir):
     plt.savefig(pjoin(outdir, 'hist2d.pdf'))
 
 ##########################################################
-def plot_density_real(df, xx, yy, mapx, mapy, outdir):
+def plot_density_real_separate(df, xx, yy, mapx, mapy, outdir):
     """Plot the densities in the grid @xx, @yy
     """
     info(inspect.stack()[0][3] + '()')
@@ -120,6 +120,33 @@ def plot_density_real(df, xx, yy, mapx, mapy, outdir):
     plt.tight_layout(2)
     plt.savefig(pjoin(outdir, 'density_real.png'))
 
+##########################################################
+def plot_density_real(df, xx, yy, mapx, mapy, outdir):
+    """Plot the densities in the grid @xx, @yy
+    """
+    info(inspect.stack()[0][3] + '()')
+
+    labels = np.unique(df.label)
+
+    nrows = 1;  ncols = len(labels)
+    figscale = 4
+    fig, axs = plt.subplots(nrows, ncols, squeeze=False,
+                figsize=(ncols*figscale, nrows*figscale))
+
+    pdfvals = np.ndarray((1, len(labels), xx.shape[0], xx.shape[1]))
+
+    for j, l in enumerate(labels):
+        filtered = df[(df.label == int(l))]
+        pdfvals[0, j, :, :] = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy)
+
+    for j, l in enumerate(labels):
+        axs[0, j].set_title('Type {}'.format(l))
+        vals = pdfvals[0][j]
+        axs[0, j].plot(mapx, mapy, c='dimgray')
+        im = axs[0, j].scatter(xx, yy, c=vals)
+
+    plt.tight_layout(2)
+    plt.savefig(pjoin(outdir, 'density_real.png'))
 ##########################################################
 def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir):
     """Plot the densities in the grid @xx, @yy
@@ -289,9 +316,9 @@ def main():
     info(inspect.stack()[0][3] + '()')
     t0 = time.time()
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--clusterlabels', required=True,
-            help='Path to the csv containing the cluster and labels for each location')
-    parser.add_argument('--shppath', required=True, help='Path to the SHP dir')
+    # parser.add_argument('--clusterlabels', required=True,
+            # help='Path to the csv containing the cluster and labels for each location')
+    # parser.add_argument('--shppath', required=True, help='Path to the SHP dir')
     parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
     args = parser.parse_args()
 
@@ -299,12 +326,15 @@ def main():
 
     plt.rcParams['image.cmap'] = 'Blues'
 
-    df = pd.read_csv(args.clusterlabels)
+    clulabelspath = './data/20200202-types/20200601-combine_me_he/labels_and_clu.csv'
+    shppath = './data/20200202-types/20200224-shp/'
+
+    df = pd.read_csv(clulabelspath)
     xx, yy = create_meshgrid(df.x, df.y, relmargin=.1)
-    mapx, mapy = get_shp_points(args.shppath)
+    mapx, mapy = get_shp_points(shppath)
 
     # f = compute_pdf_over_grid(df.x, df.y, xx, yy)
-    # plt.scatter(df.x, df.y); plt.savefig(pjoin(args.outdir, 'points.pdf'))
+    plt.scatter(df.x, df.y); plt.savefig(pjoin(args.outdir, 'points.pdf'))
     # plot_hist2d(df.x, df.y, args.outdir)
     # plot_surface(f, df.x, df.y, xx, yy, args.outdir)
     # plot_contours(f, df.x, df.y, xx, yy, args.outdir)

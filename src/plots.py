@@ -13,6 +13,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import igraph
 from matplotlib.ticker import FormatStrFormatter
+import matplotlib_venn
 
 from src.utils import info
 
@@ -129,7 +130,17 @@ class MasksGenerator:
         x = np.delete(polys, todel, axis=0)
         return x
 
-    ##########################################################
+##########################################################
+def plot_venn(data, outdir):
+    """Plot venn diagram
+    """
+    info(inspect.stack()[0][3] + '()')
+    subsets={
+            '100': 10, '010': 10, '001': 10,
+            '110': 10, '101': 10, '011': 10, '111': 10,
+    matplotlib_venn.venn3(subsets=subsets,
+            set_labels = ('A', 'B', 'C'))
+    plt.savefig(pjoin(outdir, 'counts_venn.pdf'))
 
 ##########################################################
 def generate_rgb_colors(n):
@@ -174,7 +185,6 @@ def main():
                 bbox = (2000, 2000),
                 vertex_color=[ colorlist[m] for m in membership ],
                 vertex_frame_width=0)
-
 
 if __name__ == "__main__":
     main()
