@@ -350,8 +350,8 @@ def main():
     # plot_surface(f, df.x, df.y, xx, yy, args.outdir)
     # plot_wireframe(f, df.x, df.y, xx, yy, args.outdir)
 
-    plot_density_real(df, xx, yy, mapx, mapy, args.outdir)
-    # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
+    # plot_density_real(df, xx, yy, mapx, mapy, args.outdir)
+    plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
     # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
     info('Elapsed time:{}'.format(time.time()-t0))
 
