@@ -109,7 +109,7 @@ def plot_density_real_separate(df, xx, yy, mapx, mapy, outdir):
         axs[i, 0].set_ylabel('Annotator {}'.format(i))
         # if i == 0: axs[i, 0].set_title('Mean pdf')
         for j, l in enumerate(labels):
-            if i == 0: axs[i, j].set_title('Type {}'.format(l))
+            if i == 0: axs[i, j].set_title('Graffiti type {}'.format(l))
             vals = pdfvals[i][j]
             axs[i, j].plot(mapx, mapy, c='dimgray')
             im = axs[i, j].scatter(xx, yy, c=vals)
@@ -131,7 +131,7 @@ def plot_density_real(df, xx, yy, mapx, mapy, outdir):
     nrows = 1;  ncols = len(labels)
     figscale = 4
     fig, axs = plt.subplots(nrows, ncols, squeeze=False,
-                figsize=(ncols*figscale, nrows*figscale))
+                figsize=(.9*ncols*figscale, nrows*figscale))
 
     pdfvals = np.ndarray((1, len(labels), xx.shape[0], xx.shape[1]))
 
@@ -139,14 +139,23 @@ def plot_density_real(df, xx, yy, mapx, mapy, outdir):
         filtered = df[(df.label == int(l))]
         pdfvals[0, j, :, :] = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy)
 
+    import matplotlib
+    cmaporig = matplotlib.rcParams['image.cmap']
+    matplotlib.rcParams['image.cmap'] = 'bone'
+    labelstr = ['A', 'B' ,'C']
     for j, l in enumerate(labels):
-        axs[0, j].set_title('Type {}'.format(l))
+        axs[0, j].set_title('Graffiti type {}'.format(labelstr[j]))
         vals = pdfvals[0][j]
+        # vals = np.max(vals) - vals
         axs[0, j].plot(mapx, mapy, c='dimgray')
         im = axs[0, j].scatter(xx, yy, c=vals)
+        cbar = axs[0, j].figure.colorbar(im, ax=axs[0, j], fraction=0.04, pad=0.00)
+        axs[0, j].axis("off")
+
 
     plt.tight_layout(2)
     plt.savefig(pjoin(outdir, 'density_real.png'))
+    matplotlib.rcParams['image.cmap'] = cmaporig
 ##########################################################
 def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir):
     """Plot the densities in the grid @xx, @yy
@@ -326,7 +335,7 @@ def main():
 
     plt.rcParams['image.cmap'] = 'Blues'
 
-    clulabelspath = './data/20200202-types/20200601-combine_me_he/labels_and_clu.csv'
+    clulabelspath = './data/20200202-types/20200601-combine_me_he/labels_and_clu_nodupls.csv'
     shppath = './data/20200202-types/20200224-shp/'
 
     df = pd.read_csv(clulabelspath)
@@ -342,8 +351,8 @@ def main():
     # plot_wireframe(f, df.x, df.y, xx, yy, args.outdir)
 
     plot_density_real(df, xx, yy, mapx, mapy, args.outdir)
-    plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
-    plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
+    # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
+    # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
     info('Elapsed time:{}'.format(time.time()-t0))
 
 ##########################################################

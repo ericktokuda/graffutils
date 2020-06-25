@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import igraph
 from matplotlib.ticker import FormatStrFormatter
 import matplotlib_venn
+import module
 
 from src.utils import info
 
@@ -137,7 +138,7 @@ def plot_venn(data, outdir):
     info(inspect.stack()[0][3] + '()')
     subsets={
             '100': 10, '010': 10, '001': 10,
-            '110': 10, '101': 10, '011': 10, '111': 10,
+            '110': 10, '101': 10, '011': 10, '111': 10,}
     matplotlib_venn.venn3(subsets=subsets,
             set_labels = ('A', 'B', 'C'))
     plt.savefig(pjoin(outdir, 'counts_venn.pdf'))
@@ -148,6 +149,7 @@ def generate_rgb_colors(n):
     rgbcols = map(lambda x: colorsys.hsv_to_rgb(*x), hsvcols)
     return list(rgbcols)
 
+##########################################################
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--graphml', required=True, help='Graphml path')
