@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import shutil
 
+import scipy
 from scipy import stats
 import pandas as pd
 import geopandas as geopd
@@ -151,7 +152,6 @@ def plot_density_real(df, xx, yy, mapx, mapy, outdir):
         im = axs[0, j].scatter(xx, yy, c=vals)
         cbar = axs[0, j].figure.colorbar(im, ax=axs[0, j], fraction=0.04, pad=0.00)
         axs[0, j].axis("off")
-
 
     plt.tight_layout(2)
     plt.savefig(pjoin(outdir, 'density_real.png'))
@@ -321,6 +321,34 @@ def filename_from_coords(x, y, heading, ext='jpg'):
     return '_{}_{}_{}.{}'.format(y, x, heading, ext)
 
 ##########################################################
+def plot_count_vs_accessib(dfclulabels, accessibpath, outdir):
+    """Plot count of graffiti vs accessibility for each node of the graph"""
+    info(inspect.stack()[0][3] + '()')
+
+    dfaccessib = pd.read_csv(accessibpath)
+
+    graffloc = np.vstack([dfclulabels.x, dfclulabels.y])
+    kernel = stats.gaussian_kde(graffloc, bw_method='scott')
+    # kernel = stats.gaussian_kde(graffloc, bw_method=2)
+    info('KERNEL dim:{}, n:{}, neff:{}, factor:{}, cov:{}'.format(
+        kernel.d, kernel.n, kernel.neff, kernel.factor, kernel.covariance))
+    
+    k = kernel(np.vstack([dfaccessib.x.values, dfaccessib.y.values]))
+
+    for v in [5, 10, 15]:
+        acc = dfaccessib['accessib{:02d}'.format(v)].values
+        corr, pvalue = scipy.stats.pearsonr(k, acc)
+        nrows = 1;  ncols = 1
+        figscale = 10
+        fig, axs = plt.subplots(nrows, ncols,
+                    figsize=(ncols*figscale, nrows*figscale))
+        axs.scatter(k, acc)
+        info('accessib nsteps:{}, corr:{}'.format(v, corr))
+        axs.set_title('Pearson corr:{:.2f}'.format(corr))
+        plt.savefig(pjoin(outdir, 'acc{:02d}.png'.format(v)))
+        fig.clear()
+    
+##########################################################
 def main():
     info(inspect.stack()[0][3] + '()')
     t0 = time.time()
@@ -342,8 +370,7 @@ def main():
     xx, yy = create_meshgrid(df.x, df.y, relmargin=.1)
     mapx, mapy = get_shp_points(shppath)
 
-    # f = compute_pdf_over_grid(df.x, df.y, xx, yy)
-    plt.scatter(df.x, df.y); plt.savefig(pjoin(args.outdir, 'points.pdf'))
+    # plt.scatter(df.x, df.y); plt.savefig(pjoin(args.outdir, 'points.pdf'))
     # plot_hist2d(df.x, df.y, args.outdir)
     # plot_surface(f, df.x, df.y, xx, yy, args.outdir)
     # plot_contours(f, df.x, df.y, xx, yy, args.outdir)
@@ -351,8 +378,11 @@ def main():
     # plot_wireframe(f, df.x, df.y, xx, yy, args.outdir)
 
     # plot_density_real(df, xx, yy, mapx, mapy, args.outdir)
-    plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
+    # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
     # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
+
+    accessibpath = 'data/accessib.csv'
+    plot_count_vs_accessib(df, accessibpath, args.outdir)
     info('Elapsed time:{}'.format(time.time()-t0))
 
 ##########################################################
