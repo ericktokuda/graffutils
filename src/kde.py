@@ -347,6 +347,8 @@ def plot_count_vs_accessib(dfclulabels, accessibpath, outdir):
                     figsize=(ncols*figscale, nrows*figscale))
         axs.scatter(k, acc)
         info('accessib nsteps:{}, corr:{}'.format(v, corr))
+        axs.set_xlabel('Graffiti count')
+        axs.set_ylabel('Accessibility')
         axs.set_title('Pearson corr:{:.2f}'.format(corr))
         plt.savefig(pjoin(outdir, 'acc{:02d}.png'.format(v)))
         fig.clear()
@@ -385,7 +387,7 @@ def main():
     # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
     # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
 
-    # plot_count_vs_accessib(df, accessibpath, args.outdir)
+    plot_count_vs_accessib(df, accessibpath, args.outdir)
     info('Elapsed time:{}'.format(time.time()-t0))
 
 ##########################################################
