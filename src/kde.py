@@ -23,6 +23,8 @@ import geopandas as geopd
 from mpl_toolkits.mplot3d import axes3d
 from scipy.spatial import cKDTree
 
+from utils import export_individual_axis
+
 #############################################################
 def info(*args):
     pref = datetime.now().strftime('[%y%m%d %H:%M:%S]')
@@ -156,42 +158,43 @@ def plot_density_real(df, xx, yy, mapx, mapy, outdir):
     plt.tight_layout(2)
     plt.savefig(pjoin(outdir, 'density_real.png'))
     matplotlib.rcParams['image.cmap'] = cmaporig
+
 ##########################################################
 def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir):
-    """Plot the densities in the grid @xx, @yy
-    """
+    """Plot the densities in the grid @xx, @yy """
     info(inspect.stack()[0][3] + '()')
 
-    annotators = np.unique(df.annotator)
     labels = np.unique(df.label)
 
-    grafftypesstr = ['A', 'B', 'C']
-    nrows = len(annotators);  ncols = len(labels) + 1
+    nrows = 1;  ncols = len(labels) + 1
     figscale = 4
     fig, axs = plt.subplots(nrows, ncols, squeeze=False,
                 figsize=(ncols*figscale, nrows*figscale))
 
-    pdfvals = np.ndarray((len(annotators), len(labels), xx.shape[0], xx.shape[1]))
-    for i, anno in enumerate(annotators):
-        for j, l in enumerate(labels):
-            filtered = df[(df.annotator == anno) & (df.label == int(l))]
-            pdfvals[i, j, :, :] = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy)
+    i = 0
+    pdfvals = np.ndarray((1, len(labels), xx.shape[0], xx.shape[1]))
+    for j, l in enumerate(labels):
+        filtered = df[(df.label == int(l))]
+        pdfvals[i, j, :, :] = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy)
 
-    for i, anno in enumerate(annotators):
-        axs[i, 0].set_ylabel('Annotator {}'.format(i))
-        meanpdf = np.mean(pdfvals[i], axis=0)
-        im = axs[i, 0].scatter(xx, yy, c=meanpdf)
-        # fig.colorbar(im, ax=axs[i, 0])
-        if i == 0: axs[i, 0].set_title('Mean pdf')
-        for j, l in enumerate(labels):
-            jj = j + 1
-            if i == 0: axs[i, jj].set_title('Type {}'.format(grafftypesstr[j]))
-            vals = pdfvals[i][j] - meanpdf
-            axs[i, jj].plot(mapx, mapy, c='dimgray')
-            im = axs[i, jj].scatter(xx, yy, c=vals)
-            # fig.colorbar(im, ax=axs[i, jj])
+    axs[i, 0].plot(mapx, mapy, c='dimgray')
+    meanpdf = np.mean(pdfvals[i], axis=0)
+    im = axs[i, 0].scatter(xx, yy, c=meanpdf)
+    cbar = axs[i, 0].figure.colorbar(im, ax=axs[i, 0], fraction=0.04, pad=0.00)
+    axs[i, 0].axis("off")
+
+    for j, l in enumerate(labels):
+        jj = j + 1
+        vals = pdfvals[i][j] - meanpdf
+        axs[i, jj].plot(mapx, mapy, c='dimgray')
+        im = axs[i, jj].scatter(xx, yy, c=vals)
+        cbar = axs[i, jj].figure.colorbar(im, ax=axs[i, jj], fraction=0.04, pad=0.00)
+        axs[i, jj].axis("off")
 
     plt.tight_layout(2)
+    labels = ['mean', 'typeA', 'typeB', 'typeC']
+    pads = [.1, .1, .6, .1]
+    export_individual_axis(axs, fig, labels, outdir, pad=pads, prefix='kde_', fmt='png')
     plt.savefig(pjoin(outdir, 'density_difftomean.pdf'))
 
 ##########################################################
@@ -361,10 +364,11 @@ def main():
 
     if not os.path.isdir(args.outdir): os.mkdir(args.outdir)
 
-    plt.rcParams['image.cmap'] = 'Blues'
+    plt.rcParams['image.cmap'] = 'bone'
 
     clulabelspath = './data/20200202-types/20200601-combine_me_he/labels_and_clu_nodupls.csv'
     shppath = './data/20200202-types/20200224-shp/'
+    accessibpath = 'data/accessib.csv'
 
     df = pd.read_csv(clulabelspath)
     xx, yy = create_meshgrid(df.x, df.y, relmargin=.1)
@@ -381,8 +385,7 @@ def main():
     # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
     # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
 
-    accessibpath = 'data/accessib.csv'
-    plot_count_vs_accessib(df, accessibpath, args.outdir)
+    # plot_count_vs_accessib(df, accessibpath, args.outdir)
     info('Elapsed time:{}'.format(time.time()-t0))
 
 ##########################################################
