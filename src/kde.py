@@ -160,6 +160,10 @@ def plot_density_real(df, xx, yy, mapx, mapy, outdir):
     matplotlib.rcParams['image.cmap'] = cmaporig
 
 ##########################################################
+def kl_divergence(p, q):
+    return np.sum(np.where(p != 0, p * np.log(p / q), 0))
+
+##########################################################
 def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir):
     """Plot the densities in the grid @xx, @yy """
     info(inspect.stack()[0][3] + '()')
@@ -183,14 +187,18 @@ def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir):
     cbar = axs[i, 0].figure.colorbar(im, ax=axs[i, 0], fraction=0.04, pad=0.00)
     axs[i, 0].axis("off")
 
+    kld = {}
     for j, l in enumerate(labels):
         jj = j + 1
         vals = pdfvals[i][j] - meanpdf
+        kld[j] = kl_divergence(pdfvals[i][j], meanpdf)
         axs[i, jj].plot(mapx, mapy, c='dimgray')
         im = axs[i, jj].scatter(xx, yy, c=vals)
         cbar = axs[i, jj].figure.colorbar(im, ax=axs[i, jj], fraction=0.04, pad=0.00)
         axs[i, jj].axis("off")
 
+    klddf = pd.DataFrame.from_dict(kld, orient='index', columns=['kld'])
+    klddf.to_csv(pjoin(outdir, 'klds.csv'), index_label='type')
     plt.tight_layout(2)
     labels = ['mean', 'typeA', 'typeB', 'typeC']
     pads = [.1, .1, .6, .1]
