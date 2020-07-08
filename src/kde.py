@@ -338,21 +338,66 @@ def plot_count_vs_accessib(dfclulabels, accessibpath, outdir):
     
     k = kernel(np.vstack([dfaccessib.x.values, dfaccessib.y.values]))
 
-    for v in [5, 10, 15]:
-        acc = dfaccessib['accessib{:02d}'.format(v)].values
+    
+    for col in dfaccessib.columns:
+        if not col.startswith('accessib'): continue
+        acc = dfaccessib[col].values
         corr, pvalue = scipy.stats.pearsonr(k, acc)
         nrows = 1;  ncols = 1
         figscale = 10
         fig, axs = plt.subplots(nrows, ncols,
                     figsize=(ncols*figscale, nrows*figscale))
-        axs.scatter(k, acc)
-        info('accessib nsteps:{}, corr:{}'.format(v, corr))
+        axs.scatter(k, acc, s=2, alpha=0.2)
+        info('{} steps, corr:{}'.format(col, corr))
         axs.set_xlabel('Graffiti count')
         axs.set_ylabel('Accessibility')
         axs.set_title('Pearson corr:{:.2f}'.format(corr))
-        plt.savefig(pjoin(outdir, 'acc{:02d}.png'.format(v)))
-        fig.clear()
-    
+        plt.savefig(pjoin(outdir, col + '.png'))
+
+##########################################################
+def xnet2dict(xnetpath):
+    """Parse xnet file """
+    info(inspect.stack()[0][3] + '()')
+    fh = open(xnetpath)
+    lines = fh.read().strip().splitlines()
+    n = len(lines)
+    values = {
+            'header': lines[0]
+            }
+
+    for i in range(1, n):
+        line = lines[i].replace('"', '')
+        if line.startswith('#'): #heading
+            heading = line[1:]
+            values[heading] = []
+        else:
+            values[heading].append(line)
+    fh.close()
+    return values
+
+##########################################################
+def load_accessib_from_dir(accessibdir, accessibpath):
+    """Load accessibility values from dir """
+    info(inspect.stack()[0][3] + '()')
+    files = sorted(os.listdir(accessibdir))
+    accessibs = {}
+    for f in files:
+        if f.endswith('.xnet'):
+            xnetdict = xnet2dict(pjoin(accessibdir, f))
+            x = [float(v) for v in xnetdict['v x s']]
+            y = [float(v) for v in xnetdict['v y s']]
+        if not f.endswith('.txt'): continue
+        k = os.path.splitext(f)[0]
+        info('k:{}'.format(k))
+        values = open(pjoin(accessibdir, f)).read().strip().splitlines()
+        values = [ str(v) for v in values ]
+        accessibs[k] = values
+
+    df = pd.DataFrame.from_dict(accessibs)
+    df['x'] = x
+    df['y'] = y
+    df.to_csv(accessibpath, index=False)
+
 ##########################################################
 def main():
     info(inspect.stack()[0][3] + '()')
@@ -387,6 +432,9 @@ def main():
     # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
     # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
 
+    accessibdir = 'data/20200630-accessib/'
+    accessibpath = pjoin(args.outdir, 'accessib.csv')
+    load_accessib_from_dir(accessibdir, accessibpath)
     plot_count_vs_accessib(df, accessibpath, args.outdir)
     info('Elapsed time:{}'.format(time.time()-t0))
 
