@@ -11,19 +11,24 @@ import inspect
 import sys
 import numpy as np
 from itertools import product
+
 import matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import axes3d
+plt.style.use('seaborn')
+
 from datetime import datetime
 import shutil
-
 import scipy
 from scipy import stats
 import pandas as pd
 import geopandas as geopd
-from mpl_toolkits.mplot3d import axes3d
 from scipy.spatial import cKDTree
 
-from utils import export_individual_axis
+from utils import export_individual_axis, hex2rgb
+
+palettehex = ['#8dd3c7','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69']
+palette = hex2rgb(palettehex, normalized=True, alpha=1.0)
 
 #############################################################
 def info(*args):
@@ -347,20 +352,20 @@ def plot_count_vs_accessib(dfclulabels, accessibpath, outdir):
     
     k = kernel(np.vstack([dfaccessib.x.values, dfaccessib.y.values]))
 
-    
     for col in dfaccessib.columns:
         if not col.startswith('accessib'): continue
         acc = dfaccessib[col].values
         corr, pvalue = scipy.stats.pearsonr(k, acc)
         nrows = 1;  ncols = 1
-        figscale = 10
+        figscale = 5
         fig, axs = plt.subplots(nrows, ncols,
-                    figsize=(ncols*figscale, nrows*figscale))
-        axs.scatter(k, acc, s=2, alpha=0.2)
+                    figsize=(1.2*figscale, nrows*figscale))
+        axs.scatter(k, acc, s=4, c=palettehex[0], alpha=0.8)
         info('{} steps, corr:{}'.format(col, corr))
         axs.set_xlabel('Graffiti count')
         axs.set_ylabel('Accessibility')
-        axs.set_title('Pearson corr:{:.2f}'.format(corr))
+        # axs.set_title('Pearson corr:{:.2f}'.format(corr))
+        plt.tight_layout(1)
         plt.savefig(pjoin(outdir, col + '.png'))
 
 ##########################################################
@@ -438,7 +443,7 @@ def main():
     # plot_wireframe(f, df.x, df.y, xx, yy, args.outdir)
 
     # plot_density_real(df, xx, yy, mapx, mapy, args.outdir)
-    plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
+    # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
     # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
 
     accessibdir = 'data/20200630-accessib/'
