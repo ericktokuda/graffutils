@@ -191,7 +191,8 @@ def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir):
     for j, l in enumerate(labels):
         jj = j + 1
         vals = pdfvals[i][j] - meanpdf
-        kld[j] = kl_divergence(pdfvals[i][j], meanpdf)
+        kld[j] = kl_divergence(pdfvals[i][j] / np.sum(pdfvals[i][j]),
+                meanpdf / np.sum(meanpdf))
         axs[i, jj].plot(mapx, mapy, c='dimgray')
         im = axs[i, jj].scatter(xx, yy, c=vals)
         cbar = axs[i, jj].figure.colorbar(im, ax=axs[i, jj], fraction=0.04, pad=0.00)
@@ -437,7 +438,7 @@ def main():
     # plot_wireframe(f, df.x, df.y, xx, yy, args.outdir)
 
     # plot_density_real(df, xx, yy, mapx, mapy, args.outdir)
-    # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
+    plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
     # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
 
     accessibdir = 'data/20200630-accessib/'
