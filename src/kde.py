@@ -15,7 +15,7 @@ from itertools import product
 import matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d
-plt.style.use('seaborn')
+# plt.style.use('seaborn')
 
 from datetime import datetime
 import shutil
@@ -117,7 +117,7 @@ def plot_density_real_separate(df, xx, yy, mapx, mapy, outdir):
         axs[i, 0].set_ylabel('Annotator {}'.format(i))
         # if i == 0: axs[i, 0].set_title('Mean pdf')
         for j, l in enumerate(labels):
-            if i == 0: axs[i, j].set_title('Graffiti type {}'.format(l))
+            # if i == 0: axs[i, j].set_title('Graffiti type {}'.format(l))
             vals = pdfvals[i][j]
             axs[i, j].plot(mapx, mapy, c='dimgray')
             im = axs[i, j].scatter(xx, yy, c=vals)
@@ -169,7 +169,7 @@ def kl_divergence(p, q):
     return np.sum(np.where(p != 0, p * np.log(p / q), 0))
 
 ##########################################################
-def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir):
+def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir, kerbw=-1):
     """Plot the densities in the grid @xx, @yy """
     info(inspect.stack()[0][3] + '()')
 
@@ -184,7 +184,7 @@ def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir):
     pdfvals = np.ndarray((1, len(labels), xx.shape[0], xx.shape[1]))
     for j, l in enumerate(labels):
         filtered = df[(df.label == int(l))]
-        pdfvals[i, j, :, :] = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy)
+        pdfvals[i, j, :, :] = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy, kerbw)
 
     axs[i, 0].plot(mapx, mapy, c='dimgray')
     meanpdf = np.mean(pdfvals[i], axis=0)
@@ -208,7 +208,10 @@ def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir):
     plt.tight_layout(2)
     labels = ['mean', 'typeA', 'typeB', 'typeC']
     pads = [.1, .1, .6, .1]
-    export_individual_axis(axs, fig, labels, outdir, pad=pads, prefix='kde_', fmt='png')
+    export_individual_axis(axs, fig, labels, outdir, pad=pads,
+            # prefix='kde_',
+            prefix='kde_{}'.format(kerbw),
+            fmt='png')
     plt.savefig(pjoin(outdir, 'density_difftomean.pdf'))
 
 ##########################################################
@@ -292,10 +295,12 @@ def plot_types_inside_region(dforig, c0, radius, mapx, mapy, outdir):
     plt.savefig(pjoin(outdir, 'types_region.pdf'))
 
 ##########################################################
-def compute_pdf_over_grid(x, y, xx, yy):
+def compute_pdf_over_grid(x, y, xx, yy, kerparam=-1):
     positions = np.vstack([xx.ravel(), yy.ravel()])
     values = np.vstack([x, y])
-    kernel = stats.gaussian_kde(values)
+    if kerparam < -1: kernel_bw = 'scott'
+    else: kernel_bw = kerparam
+    kernel = stats.gaussian_kde(values, bw_method=kernel_bw)
     return np.reshape(kernel(positions).T, xx.shape)
 
 ##########################################################
@@ -338,35 +343,44 @@ def filename_from_coords(x, y, heading, ext='jpg'):
     return '_{}_{}_{}.{}'.format(y, x, heading, ext)
 
 ##########################################################
-def plot_count_vs_accessib(dfclulabels, accessibpath, outdir):
+def plot_count_vs_accessib(dfclulabels, accessibpath, outdir, kdeparam=-1):
     """Plot count of graffiti vs accessibility for each node of the graph"""
     info(inspect.stack()[0][3] + '()')
 
     dfaccessib = pd.read_csv(accessibpath)
 
     graffloc = np.vstack([dfclulabels.x, dfclulabels.y])
-    kernel = stats.gaussian_kde(graffloc, bw_method='scott')
+    # kernel = stats.gaussian_kde(graffloc, bw_method='scott')
+    if kdeparam < 0: kdebw = 'scott'
+    else: kdebw = kdeparam
+    kernel = stats.gaussian_kde(graffloc, bw_method=kdebw)
     # kernel = stats.gaussian_kde(graffloc, bw_method=2)
     info('KERNEL dim:{}, n:{}, neff:{}, factor:{}, cov:{}'.format(
         kernel.d, kernel.n, kernel.neff, kernel.factor, kernel.covariance))
     
     k = kernel(np.vstack([dfaccessib.x.values, dfaccessib.y.values]))
 
+    # for col in dfaccessib.columns:
     for col in dfaccessib.columns:
-        if not col.startswith('accessib'): continue
+        if not col.startswith('accessib25'): continue
+        
         acc = dfaccessib[col].values
+        inds = np.where(acc > 0)
+        acc = acc[inds]
+        k = k[inds]
         corr, pvalue = scipy.stats.pearsonr(k, acc)
         nrows = 1;  ncols = 1
         figscale = 5
         fig, axs = plt.subplots(nrows, ncols,
                     figsize=(1.2*figscale, nrows*figscale))
-        axs.scatter(k, acc, s=4, c=palettehex[0], alpha=0.8)
+        # axs.scatter(k, acc, s=4, c=palettehex[0], alpha=0.8)
+        axs.scatter(k, acc, s=4, alpha=0.2)
         info('{} steps, corr:{}'.format(col, corr))
         axs.set_xlabel('Graffiti count')
         axs.set_ylabel('Accessibility')
-        # axs.set_title('Pearson corr:{:.2f}'.format(corr))
+        axs.set_title('Pearson corr:{:.2f}'.format(corr))
         plt.tight_layout(1)
-        plt.savefig(pjoin(outdir, col + '.png'))
+        plt.savefig(pjoin(outdir, '{}_{:.02f}.png'.format(col, kdebw)))
 
 ##########################################################
 def xnet2dict(xnetpath):
@@ -443,13 +457,21 @@ def main():
     # plot_wireframe(f, df.x, df.y, xx, yy, args.outdir)
 
     # plot_density_real(df, xx, yy, mapx, mapy, args.outdir)
-    # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
+    # return
+    # for kerbw in range(1, 5):
+    # for kerbw in np.arange(.05, .3, .05):
+        # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir, kerbw)
     # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
 
+    # .82, accessib25
     accessibdir = 'data/20200630-accessib/'
     accessibpath = pjoin(args.outdir, 'accessib.csv')
     load_accessib_from_dir(accessibdir, accessibpath)
-    plot_count_vs_accessib(df, accessibpath, args.outdir)
+    # for kdeparam in np.arange(.5, 4, .5):
+    # for kdeparam in np.arange(.75, .85, .01):
+    # for kdeparam in [.82]:
+    for kdeparam in np.arange(.05, .3, .05):
+        plot_count_vs_accessib(df, accessibpath, args.outdir, kdeparam)
     info('Elapsed time:{}'.format(time.time()-t0))
 
 ##########################################################

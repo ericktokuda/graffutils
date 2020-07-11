@@ -242,6 +242,48 @@ def plot_proportion_per_cluster(clulabelspath, outdir):
     plt.savefig(pjoin(outdir, 'count_per_type.pdf'))
 
 ##########################################################
+def plot_proportion_per_cluster2(clulabelspath, outdir):
+    """Plot cluster labels.
+    It expects a df with the points and corresponding cluster, objlabel
+    and also a list of the areas of each cluster.
+    """
+
+    info(inspect.stack()[0][3] + '()')
+
+    df = pd.read_csv(clulabelspath, index_col='id')
+    totalrows = len(df)
+
+    clusters = np.unique(df.cluster)
+    clusters_str = ['c{}'.format(cl) for cl in clusters]
+    nclusters = len(clusters)
+    labels = np.unique(df.label)
+    nlabels = len(labels)
+    labelstr = [str(l) for l in labels]
+    plotsize = 5
+
+    data = {}
+    for l in labels:
+        data[str(l)] = df[df.label == l].groupby('cluster').sum()['label'].values
+    
+    df = pd.DataFrame.from_dict(data)
+    
+    df['community'] = df.index
+    
+    pd.plotting.parallel_coordinates(
+        df, 'community',
+        )
+        # color=('#556270', '#4ECDC4', '#C7F464'))
+    ax = plt.gca()
+    ax.set_xlabel('Graffiti type')
+    ax.set_ylabel('Number of occurrences')
+    # ax.legend()
+    # leg = ax.get_legend()
+    breakpoint()
+    
+    plt.savefig('/tmp/parallel.png')
+
+
+##########################################################
 def plot_counts_normalized(clulabelspath, cluareaspath, outdir):
     df = pd.read_csv(clulabelspath, index_col='id')
     totalrows = len(df)
@@ -557,7 +599,7 @@ def main():
             # annotator, outlabelsclu)
     # plot_types(clupath, shppath, outlabelsclu, args.outdir)
     # plot_communities(clupath, graphmlpath, shppath, args.outdir)
-    plot_proportion_per_cluster(outlabelsclu, args.outdir)
+    plot_proportion_per_cluster2(outlabelsclu, args.outdir)
     # plot_counts_normalized(outlabelsclu, cluareaspath, args.outdir)
     # plot_venn(outlabelsclu, args.outdir)
 
