@@ -346,8 +346,53 @@ def filename_from_coords(x, y, heading, ext='jpg'):
     return '_{}_{}_{}.{}'.format(y, x, heading, ext)
 
 ##########################################################
-def plot_count_vs_accessib(dfclulabels, accessibpath, outdir,
-        kdeparam='scott'):
+def calculate_correlations(dfclulabels, accessibpath, outdir, kdeparam='scott'):
+    """Plot count of graffiti vs accessibility for each node of the graph"""
+    info(inspect.stack()[0][3] + '()')
+
+    dfaccessib = pd.read_csv(accessibpath)
+
+    if kdeparam < 0: kdebw = 'scott'
+    else: kdebw = kdeparam
+    
+    corrs = {}
+    for l in np.unique(dfclulabels.label):
+        filtered = dfclulabels[dfclulabels.label == l]
+        
+        graffloc = np.vstack([filtered.x, filtered.y])
+        kernel = stats.gaussian_kde(graffloc, bw_method=kdebw)
+        info('KERNEL dim:{}, n:{}, neff:{}, factor:{}, cov:{}'.format(
+            kernel.d, kernel.n, kernel.neff, kernel.factor, kernel.covariance))
+        
+        k = ker = kernel(np.vstack([dfaccessib.x.values, dfaccessib.y.values]))
+
+        corrs[l] = []
+        for col in sorted(dfaccessib.columns):
+            if not 'accessib' in col: continue
+            acc = dfaccessib[col].values
+
+            # inds = np.where(acc > 0) #filter out 0-valued accessib
+            # if len(inds[0]) == 0: continue
+            # acc = acc[inds]
+            # k = ker[inds]
+
+            # inds = np.where(k > 0) #filter out 0-valued kernels 
+            # if len(inds[0]) == 0: continue
+            # k = k[inds]
+            # acc = acc[inds]
+            corr, pvalue = scipy.stats.pearsonr(k, acc)
+            corrs[l].append(corr)
+            info('accessib{}, label{}, corr:{}'.format(col, l, corr))
+
+    accessibs = []
+    for col in sorted(dfaccessib.columns):
+        if 'accessib' in col: accessibs.append(col)
+
+    corsdf = pd.DataFrame.from_dict(corrs, orient='index', columns=accessibs)
+    corsdf.to_csv(pjoin(outdir, 'corrs.csv'))
+
+##########################################################
+def plot_count_vs_accessib(dfclulabels, accessibpath, outdir, kdeparam='scott'):
     """Plot count of graffiti vs accessibility for each node of the graph"""
     info(inspect.stack()[0][3] + '()')
 
@@ -366,15 +411,15 @@ def plot_count_vs_accessib(dfclulabels, accessibpath, outdir,
         if not 'accessib' in col: continue
         acc = dfaccessib[col].values
 
-        inds = np.where(acc > 0) #filter out 0-valued accessibility 
-        if len(inds[0]) == 0: continue
-        acc = acc[inds]
-        k = ker[inds]
+        # inds = np.where(acc > 0) #filter out 0-valued accessibility 
+        # if len(inds[0]) == 0: continue
+        # acc = acc[inds]
+        # k = ker[inds]
 
-        inds = np.where(k > 0) #filter out 0-valued kernels 
-        if len(inds[0]) == 0: continue
-        k = k[inds]
-        acc = acc[inds]
+        # inds = np.where(k > 0) #filter out 0-valued kernels 
+        # if len(inds[0]) == 0: continue
+        # k = k[inds]
+        # acc = acc[inds]
 
         corr, pvalue = scipy.stats.pearsonr(k, acc)
         nrows = 1;  ncols = 1
@@ -382,7 +427,7 @@ def plot_count_vs_accessib(dfclulabels, accessibpath, outdir,
         fig, axs = plt.subplots(nrows, ncols,
                     figsize=(1.2*figscale, nrows*figscale))
         axs.scatter(k, acc, s=4, alpha=0.2)
-        info('{} steps, corr:{}'.format(col, corr))
+        info('{} corr:{}'.format(col, corr))
         axs.set_xlabel('Graffiti count')
         axs.set_ylabel('Accessibility')
         axs.set_title('Pearson corr:{:.2f}'.format(corr))
@@ -451,11 +496,11 @@ def main():
     if not os.path.isdir(args.outdir): os.mkdir(args.outdir)
 
     plt.rcParams['image.cmap'] = 'bone'
+    kerbws = np.arange(.05, .41, .05)
 
     df = pd.read_csv(args.clusterlabels)
     xx, yy = create_meshgrid(df.x, df.y, relmargin=.1)
     mapx, mapy = get_shp_points(args.shpdir)
-
     # plt.scatter(df.x, df.y); plt.savefig(pjoin(args.outdir, 'points.pdf'))
     # plot_hist2d(df.x, df.y, args.outdir)
     # plot_surface(f, df.x, df.y, xx, yy, args.outdir)
@@ -464,14 +509,18 @@ def main():
     # plot_wireframe(f, df.x, df.y, xx, yy, args.outdir)
 
     # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
-    # kerbw = 'scott'  for kerbw in np.arange(.05, .41, .05):
-    # plot_densities(df, xx, yy, mapx, mapy, args.outdir, kerbw)
+
+    # for kerbw in kerbws:
+        # plot_densities(df, xx, yy, mapx, mapy, args.outdir, kerbw)
+
     # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
 
     accessibpath = pjoin(args.outdir, 'accessib.csv')
     load_accessib_from_dir(args.accessibdir, accessibpath)
-    for kdeparam in np.arange(.05, .36, .05):
-        plot_count_vs_accessib(df, accessibpath, args.outdir, kdeparam)
+    for kerbw in kerbws:
+        # plot_count_vs_accessib(df, accessibpath, args.outdir, kerbw)
+        calculate_correlations(df, accessibpath, args.outdir, kerbw)
+    # def calculate_correlations(dfclulabels, accessibpath, outdir, kdeparam='scott'):
     info('Elapsed time:{}'.format(time.time()-t0))
 
 ##########################################################
