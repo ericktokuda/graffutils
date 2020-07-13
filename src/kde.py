@@ -179,22 +179,20 @@ def plot_densities(df, xx, yy, mapx, mapy, outdir, kerbw='scott'):
 
     labels = np.unique(df.label)
 
-    nrows = 1;  ncols = len(labels) + 1
+    ncols = len(labels) + 1
     figscale = 4
-    fig, axs = plt.subplots(nrows, ncols, squeeze=False,
-                figsize=(ncols*figscale, nrows*figscale))
+    fig, axs = plt.subplots(ncols, figsize=(figscale, ncols*figscale))
 
-    i = 0
     pdfvals = np.ndarray((len(labels), xx.shape[0], xx.shape[1]))
     for j, l in enumerate(labels):
         filtered = df[(df.label == int(l))]
         pdfvals[j, :, :], _ = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy, kerbw)
 
-    axs[i, 0].plot(mapx, mapy, c='dimgray')
+    axs[0].plot(mapx, mapy, c='dimgray')
     meanpdf = np.mean(pdfvals, axis=0)
-    im = axs[i, 0].scatter(xx, yy, c=meanpdf)
-    cbar = axs[i, 0].figure.colorbar(im, ax=axs[i, 0], fraction=0.04, pad=0.00)
-    axs[i, 0].axis("off")
+    im = axs[ 0].scatter(xx, yy, c=meanpdf)
+    cbar = axs[0].figure.colorbar(im, ax=axs[0], fraction=0.04, pad=0.00)
+    axs[0].axis("off")
 
     kld = {}
     for j, l in enumerate(labels):
@@ -202,10 +200,10 @@ def plot_densities(df, xx, yy, mapx, mapy, outdir, kerbw='scott'):
         vals = pdfvals[j] - meanpdf
         kld[j] = kl_divergence(pdfvals[j] / np.sum(pdfvals[j]),
                 meanpdf / np.sum(meanpdf))
-        axs[i, jj].plot(mapx, mapy, c='dimgray')
-        im = axs[i, jj].scatter(xx, yy, c=vals)
-        cbar = axs[i, jj].figure.colorbar(im, ax=axs[i, jj], fraction=0.04, pad=0.00)
-        axs[i, jj].axis("off")
+        axs[jj].plot(mapx, mapy, c='dimgray') # map
+        im = axs[jj].scatter(xx, yy, c=vals)
+        cbar = axs[jj].figure.colorbar(im, ax=axs[jj], fraction=0.04, pad=0.00)
+        axs[jj].axis("off")
 
     klddf = pd.DataFrame.from_dict(kld, orient='index', columns=['kld'])
     klddf.to_csv(pjoin(outdir, 'klds.csv'), index_label='type')
@@ -218,6 +216,7 @@ def plot_densities(df, xx, yy, mapx, mapy, outdir, kerbw='scott'):
 
     export_individual_axis(axs, fig, labels, outdir, pad=pads,
             prefix=pref, fmt='png')
+
     plt.savefig(pjoin(outdir, 'density_difftomean.pdf'))
 
 ##########################################################
@@ -347,37 +346,41 @@ def filename_from_coords(x, y, heading, ext='jpg'):
     return '_{}_{}_{}.{}'.format(y, x, heading, ext)
 
 ##########################################################
-def plot_count_vs_accessib(dfclulabels, accessibpath, outdir, kdeparam=-1):
+def plot_count_vs_accessib(dfclulabels, accessibpath, outdir,
+        kdeparam='scott'):
     """Plot count of graffiti vs accessibility for each node of the graph"""
     info(inspect.stack()[0][3] + '()')
 
     dfaccessib = pd.read_csv(accessibpath)
 
     graffloc = np.vstack([dfclulabels.x, dfclulabels.y])
-    # kernel = stats.gaussian_kde(graffloc, bw_method='scott')
     if kdeparam < 0: kdebw = 'scott'
     else: kdebw = kdeparam
     kernel = stats.gaussian_kde(graffloc, bw_method=kdebw)
-    # kernel = stats.gaussian_kde(graffloc, bw_method=2)
     info('KERNEL dim:{}, n:{}, neff:{}, factor:{}, cov:{}'.format(
         kernel.d, kernel.n, kernel.neff, kernel.factor, kernel.covariance))
     
-    k = kernel(np.vstack([dfaccessib.x.values, dfaccessib.y.values]))
+    k = ker = kernel(np.vstack([dfaccessib.x.values, dfaccessib.y.values]))
 
-    # for col in dfaccessib.columns:
     for col in dfaccessib.columns:
-        if not col.startswith('accessib25'): continue
-        
+        if not 'accessib' in col: continue
         acc = dfaccessib[col].values
-        inds = np.where(acc > 0)
+
+        inds = np.where(acc > 0) #filter out 0-valued accessibility 
+        if len(inds[0]) == 0: continue
         acc = acc[inds]
+        k = ker[inds]
+
+        inds = np.where(k > 0) #filter out 0-valued kernels 
+        if len(inds[0]) == 0: continue
         k = k[inds]
+        acc = acc[inds]
+
         corr, pvalue = scipy.stats.pearsonr(k, acc)
         nrows = 1;  ncols = 1
         figscale = 5
         fig, axs = plt.subplots(nrows, ncols,
                     figsize=(1.2*figscale, nrows*figscale))
-        # axs.scatter(k, acc, s=4, c=palettehex[0], alpha=0.8)
         axs.scatter(k, acc, s=4, alpha=0.2)
         info('{} steps, corr:{}'.format(col, corr))
         axs.set_xlabel('Graffiti count')
@@ -460,20 +463,15 @@ def main():
     # plot_surface(f, df.x, df.y, xx, yy, args.outdir)
     # plot_wireframe(f, df.x, df.y, xx, yy, args.outdir)
 
-    # return
-    # for kerbw in range(1, 5):
-    # for kerbw in np.arange(.05, .4, .05):
-        # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir, kerbw)
-        # plot_density_real(df, xx, yy, mapx, mapy, args.outdir, kerbw)
     # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
-    kerbw = 'scott'
-    plot_densities(df, xx, yy, mapx, mapy, args.outdir)
+    # kerbw = 'scott'  for kerbw in np.arange(.05, .41, .05):
+    # plot_densities(df, xx, yy, mapx, mapy, args.outdir, kerbw)
     # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
 
     accessibpath = pjoin(args.outdir, 'accessib.csv')
     load_accessib_from_dir(args.accessibdir, accessibpath)
-    # for kdeparam in np.arange(.05, .3, .05):
-        # plot_count_vs_accessib(df, accessibpath, args.outdir, kdeparam)
+    for kdeparam in np.arange(.05, .36, .05):
+        plot_count_vs_accessib(df, accessibpath, args.outdir, kdeparam)
     info('Elapsed time:{}'.format(time.time()-t0))
 
 ##########################################################
