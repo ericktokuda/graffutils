@@ -173,7 +173,7 @@ def kl_divergence(p, q):
     return np.sum(np.where(p != 0, p * np.log(p / q), 0))
 
 ##########################################################
-def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir, kerbw='scott'):
+def plot_densities(df, xx, yy, mapx, mapy, outdir, kerbw='scott'):
     """Plot the densities in the grid @xx, @yy """
     info(inspect.stack()[0][3] + '()')
 
@@ -185,13 +185,13 @@ def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir, kerbw='scott'):
                 figsize=(ncols*figscale, nrows*figscale))
 
     i = 0
-    pdfvals = np.ndarray((1, len(labels), xx.shape[0], xx.shape[1]))
+    pdfvals = np.ndarray((len(labels), xx.shape[0], xx.shape[1]))
     for j, l in enumerate(labels):
         filtered = df[(df.label == int(l))]
-        pdfvals[i, j, :, :], _ = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy, kerbw)
+        pdfvals[j, :, :], _ = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy, kerbw)
 
     axs[i, 0].plot(mapx, mapy, c='dimgray')
-    meanpdf = np.mean(pdfvals[i], axis=0)
+    meanpdf = np.mean(pdfvals, axis=0)
     im = axs[i, 0].scatter(xx, yy, c=meanpdf)
     cbar = axs[i, 0].figure.colorbar(im, ax=axs[i, 0], fraction=0.04, pad=0.00)
     axs[i, 0].axis("off")
@@ -199,8 +199,8 @@ def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir, kerbw='scott'):
     kld = {}
     for j, l in enumerate(labels):
         jj = j + 1
-        vals = pdfvals[i][j] - meanpdf
-        kld[j] = kl_divergence(pdfvals[i][j] / np.sum(pdfvals[i][j]),
+        vals = pdfvals[j] - meanpdf
+        kld[j] = kl_divergence(pdfvals[j] / np.sum(pdfvals[j]),
                 meanpdf / np.sum(meanpdf))
         axs[i, jj].plot(mapx, mapy, c='dimgray')
         im = axs[i, jj].scatter(xx, yy, c=vals)
@@ -212,9 +212,12 @@ def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir, kerbw='scott'):
     plt.tight_layout(2)
     labels = ['mean', 'typeA', 'typeB', 'typeC']
     pads = [.1, .1, .6, .1]
+
+    if type(kerbw) == str: pref = 'ker_{}_'.format(kerbw)
+    else: pref = 'ker_{:.02f}_'.format(kerbw)
+
     export_individual_axis(axs, fig, labels, outdir, pad=pads,
-            prefix='kde_{:.02f}'.format(kerbw),
-            fmt='png')
+            prefix=pref, fmt='png')
     plt.savefig(pjoin(outdir, 'density_difftomean.pdf'))
 
 ##########################################################
@@ -459,10 +462,12 @@ def main():
 
     # return
     # for kerbw in range(1, 5):
-    for kerbw in np.arange(.05, .4, .05):
+    # for kerbw in np.arange(.05, .4, .05):
         # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir, kerbw)
-        plot_density_real(df, xx, yy, mapx, mapy, args.outdir, kerbw)
+        # plot_density_real(df, xx, yy, mapx, mapy, args.outdir, kerbw)
     # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
+    kerbw = 'scott'
+    plot_densities(df, xx, yy, mapx, mapy, args.outdir)
     # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
 
     accessibpath = pjoin(args.outdir, 'accessib.csv')

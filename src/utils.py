@@ -45,17 +45,31 @@ def read_hdf5(h5path):
 
 ##########################################################
 def export_individual_axis(ax, fig, labels, outdir, pad=0.3, prefix='', fmt='pdf'):
-    n = ax.shape[0]*ax.shape[1]
+    if len(ax.shape) == 1: onerow = True
+    elif len(ax.shape) == 2: onerow = False
+    else: raise Exception('Just handle 1D or 2D axes')
+ 
+    n = 1
+    for el in ax.shape: n *= el
+ 
     for k in range(n):
-        i = k // ax.shape[1]
-        j = k  % ax.shape[1]
-        ax[i, j].set_title('')
+        if onerow:
+            ax[k].set_title('')
+        else:
+            i = k // ax.shape[1]
+            j = k  % ax.shape[1]
+            ax[i, j].set_title('')
 
     for k in range(n):
-        i = k // ax.shape[1]
-        j = k  % ax.shape[1]
         coordsys = fig.dpi_scale_trans.inverted()
-        extent = ax[i, j].get_window_extent().transformed(coordsys)
+
+        if onerow:
+            extent = ax[k].get_window_extent().transformed(coordsys)
+        else:
+            i = k // ax.shape[1]
+            j = k  % ax.shape[1]
+            extent = ax[i, j].get_window_extent().transformed(coordsys)
+
         x0, y0, x1, y1 = extent.extents
 
         if isinstance(pad, list):
