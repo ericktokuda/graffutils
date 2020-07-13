@@ -111,7 +111,7 @@ def plot_density_real_separate(df, xx, yy, mapx, mapy, outdir):
     for i, anno in enumerate(annotators):
         for j, l in enumerate(labels):
             filtered = df[(df.annotator == anno) & (df.label == int(l))]
-            pdfvals[i, j, :, :] = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy)
+            pdfvals[i, j, :, :], _ = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy)
 
     for i, anno in enumerate(annotators):
         axs[i, 0].set_ylabel('Annotator {}'.format(i))
@@ -129,9 +129,8 @@ def plot_density_real_separate(df, xx, yy, mapx, mapy, outdir):
     plt.savefig(pjoin(outdir, 'density_real.png'))
 
 ##########################################################
-def plot_density_real(df, xx, yy, mapx, mapy, outdir):
-    """Plot the densities in the grid @xx, @yy
-    """
+def plot_density_real(df, xx, yy, mapx, mapy, outdir, kerbw='scott'):
+    """Plot the densities in the grid @xx, @yy """
     info(inspect.stack()[0][3] + '()')
 
     labels = np.unique(df.label)
@@ -145,7 +144,7 @@ def plot_density_real(df, xx, yy, mapx, mapy, outdir):
 
     for j, l in enumerate(labels):
         filtered = df[(df.label == int(l))]
-        pdfvals[0, j, :, :] = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy)
+        pdfvals[0, j, :, :], _ = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy, kerbw)
 
     import matplotlib
     cmaporig = matplotlib.rcParams['image.cmap']
@@ -161,6 +160,11 @@ def plot_density_real(df, xx, yy, mapx, mapy, outdir):
         axs[0, j].axis("off")
 
     plt.tight_layout(2)
+    labels = ['typeA', 'typeB', 'typeC']
+    pads = [.1, .1, .6, .1]
+    export_individual_axis(axs, fig, labels, outdir, pad=pads,
+            prefix='kde_{:.02f}'.format(kerbw),
+            fmt='png')
     plt.savefig(pjoin(outdir, 'density_real.png'))
     matplotlib.rcParams['image.cmap'] = cmaporig
 
@@ -169,7 +173,7 @@ def kl_divergence(p, q):
     return np.sum(np.where(p != 0, p * np.log(p / q), 0))
 
 ##########################################################
-def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir, kerbw=-1):
+def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir, kerbw='scott'):
     """Plot the densities in the grid @xx, @yy """
     info(inspect.stack()[0][3] + '()')
 
@@ -184,7 +188,7 @@ def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir, kerbw=-1):
     pdfvals = np.ndarray((1, len(labels), xx.shape[0], xx.shape[1]))
     for j, l in enumerate(labels):
         filtered = df[(df.label == int(l))]
-        pdfvals[i, j, :, :] = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy, kerbw)
+        pdfvals[i, j, :, :], _ = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy, kerbw)
 
     axs[i, 0].plot(mapx, mapy, c='dimgray')
     meanpdf = np.mean(pdfvals[i], axis=0)
@@ -209,8 +213,7 @@ def plot_density_diff_to_mean(df, xx, yy, mapx, mapy, outdir, kerbw=-1):
     labels = ['mean', 'typeA', 'typeB', 'typeC']
     pads = [.1, .1, .6, .1]
     export_individual_axis(axs, fig, labels, outdir, pad=pads,
-            # prefix='kde_',
-            prefix='kde_{}'.format(kerbw),
+            prefix='kde_{:.02f}'.format(kerbw),
             fmt='png')
     plt.savefig(pjoin(outdir, 'density_difftomean.pdf'))
 
@@ -234,7 +237,7 @@ def plot_density_pairwise_diff(df, xx, yy, mapx, mapy, outdir):
     pdfvals = np.ndarray((len(labels), xx.shape[0], xx.shape[1]))
     for j, l in enumerate(labels):
         filtered = df[(df.label == int(l))]
-        pdfvals[j, :, :] = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy)
+        pdfvals[j, :, :], _ = compute_pdf_over_grid(filtered.x, filtered.y, xx, yy)
 
     i = 0
     for j, comb in enumerate(combs):
@@ -295,13 +298,11 @@ def plot_types_inside_region(dforig, c0, radius, mapx, mapy, outdir):
     plt.savefig(pjoin(outdir, 'types_region.pdf'))
 
 ##########################################################
-def compute_pdf_over_grid(x, y, xx, yy, kerparam=-1):
+def compute_pdf_over_grid(x, y, xx, yy, kerbw):
     positions = np.vstack([xx.ravel(), yy.ravel()])
     values = np.vstack([x, y])
-    if kerparam < -1: kernel_bw = 'scott'
-    else: kernel_bw = kerparam
-    kernel = stats.gaussian_kde(values, bw_method=kernel_bw)
-    return np.reshape(kernel(positions).T, xx.shape)
+    kernel = stats.gaussian_kde(values, bw_method=kerbw)
+    return np.reshape(kernel(positions).T, xx.shape), kernel.factor
 
 ##########################################################
 def create_meshgrid(x, y, relmargin=.1):
@@ -431,9 +432,13 @@ def main():
     info(inspect.stack()[0][3] + '()')
     t0 = time.time()
     parser = argparse.ArgumentParser(description=__doc__)
-    # parser.add_argument('--clusterlabels', required=True,
-            # help='Path to the csv containing the cluster and labels for each location')
-    # parser.add_argument('--shppath', required=True, help='Path to the SHP dir')
+    parser.add_argument('--clusterlabels',
+            default= './data/labels_and_clu_nodupls.csv',
+            help='Path to the csv containing the cluster and labels')
+    parser.add_argument('--shpdir', default= './data/shp/',
+            help='Path to the SHP dir')
+    parser.add_argument('--accessibdir', default= './data/accessib/',
+            help='Accessibility directory')
     parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
     args = parser.parse_args()
 
@@ -441,13 +446,9 @@ def main():
 
     plt.rcParams['image.cmap'] = 'bone'
 
-    clulabelspath = './data/20200202-types/20200601-combine_me_he/labels_and_clu_nodupls.csv'
-    shppath = './data/20200202-types/20200224-shp/'
-    accessibpath = 'data/accessib.csv'
-
-    df = pd.read_csv(clulabelspath)
+    df = pd.read_csv(args.clusterlabels)
     xx, yy = create_meshgrid(df.x, df.y, relmargin=.1)
-    mapx, mapy = get_shp_points(shppath)
+    mapx, mapy = get_shp_points(args.shpdir)
 
     # plt.scatter(df.x, df.y); plt.savefig(pjoin(args.outdir, 'points.pdf'))
     # plot_hist2d(df.x, df.y, args.outdir)
@@ -456,22 +457,18 @@ def main():
     # plot_surface(f, df.x, df.y, xx, yy, args.outdir)
     # plot_wireframe(f, df.x, df.y, xx, yy, args.outdir)
 
-    # plot_density_real(df, xx, yy, mapx, mapy, args.outdir)
     # return
     # for kerbw in range(1, 5):
-    # for kerbw in np.arange(.05, .3, .05):
+    for kerbw in np.arange(.05, .4, .05):
         # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir, kerbw)
+        plot_density_real(df, xx, yy, mapx, mapy, args.outdir, kerbw)
+    # plot_density_diff_to_mean(df, xx, yy, mapx, mapy, args.outdir)
     # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
 
-    # .82, accessib25
-    accessibdir = 'data/20200630-accessib/'
     accessibpath = pjoin(args.outdir, 'accessib.csv')
-    load_accessib_from_dir(accessibdir, accessibpath)
-    # for kdeparam in np.arange(.5, 4, .5):
-    # for kdeparam in np.arange(.75, .85, .01):
-    # for kdeparam in [.82]:
-    for kdeparam in np.arange(.05, .3, .05):
-        plot_count_vs_accessib(df, accessibpath, args.outdir, kdeparam)
+    load_accessib_from_dir(args.accessibdir, accessibpath)
+    # for kdeparam in np.arange(.05, .3, .05):
+        # plot_count_vs_accessib(df, accessibpath, args.outdir, kdeparam)
     info('Elapsed time:{}'.format(time.time()-t0))
 
 ##########################################################
