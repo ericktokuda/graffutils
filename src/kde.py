@@ -361,8 +361,8 @@ def calculate_correlations(dfclulabels, accessibpath, outdir, kdeparam='scott'):
         
         graffloc = np.vstack([filtered.x, filtered.y])
         kernel = stats.gaussian_kde(graffloc, bw_method=kdebw)
-        info('KERNEL dim:{}, n:{}, neff:{}, factor:{}, cov:{}'.format(
-            kernel.d, kernel.n, kernel.neff, kernel.factor, kernel.covariance))
+        # info('KERNEL dim:{}, n:{}, neff:{}, factor:{}, cov:{}'.format(
+            # kernel.d, kernel.n, kernel.neff, kernel.factor, kernel.covariance))
         
         k = ker = kernel(np.vstack([dfaccessib.x.values, dfaccessib.y.values]))
 
@@ -433,6 +433,40 @@ def plot_count_vs_accessib(dfclulabels, accessibpath, outdir, kdeparam='scott'):
         axs.set_title('Pearson corr:{:.2f}'.format(corr))
         plt.tight_layout(1)
         plt.savefig(pjoin(outdir, '{}_{:.02f}.png'.format(col, kdebw)))
+
+##########################################################
+def plot_binned_count_vs_accessib(dfclulabels, accessibpath, outdir, accessib):
+    """Plot count of graffiti vs accessibility for each node of the graph"""
+    info(inspect.stack()[0][3] + '()')
+
+    dfaccessib = pd.read_csv(accessibpath)
+    accessibs = dfaccessib[accessib]
+ 
+    kdtree = cKDTree(dfclulabels[['x', 'y']].values)
+    coords = dfaccessib[['x', 'y']].values
+    radius = 0.0005
+
+    nrows = 1;  ncols = 1
+    figscale = 5
+    fig, axs = plt.subplots(nrows, ncols,
+                figsize=(1.2*figscale, nrows*figscale))
+
+    accticks = np.arange(0, np.max(accessibs), 50)
+
+    sums = []
+    for i in range(len(accticks) - 1):
+        inds = np.where((accessibs >= accticks[i]) & (accessibs < accticks[i+1]))
+        pts = coords[inds, :]
+ 
+        inds = kdtree.query_ball_point(pts, radius)[0]
+        counts = [ len(c) for c in inds ]
+        sums.append(np.sum(counts))
+ 
+    axs.bar(accticks[1:], sums, width=50)
+    axs.set_xlabel('Accessibility')
+    axs.set_ylabel('Num. graffiti images')
+    plt.tight_layout(1)
+    plt.savefig(pjoin(outdir, 'binned_{}.png'.format(accessib)))
 
 ##########################################################
 def xnet2dict(xnetpath):
@@ -516,11 +550,14 @@ def main():
     # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
 
     accessibpath = pjoin(args.outdir, 'accessib.csv')
-    load_accessib_from_dir(args.accessibdir, accessibpath)
-    for kerbw in kerbws:
+    # load_accessib_from_dir(args.accessibdir, accessibpath)
+    # for kerbw in kerbws:
         # plot_count_vs_accessib(df, accessibpath, args.outdir, kerbw)
-        calculate_correlations(df, accessibpath, args.outdir, kerbw)
-    # def calculate_correlations(dfclulabels, accessibpath, outdir, kdeparam='scott'):
+        # info('kerbw:{}'.format(kerbw))
+        # calculate_correlations(df, accessibpath, args.outdir, kerbw)
+
+    # plot_binned_count_vs_accessib(df, accessibpath, args.outdir,
+            # 'accessib20')
     info('Elapsed time:{}'.format(time.time()-t0))
 
 ##########################################################
