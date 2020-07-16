@@ -319,7 +319,7 @@ def create_meshgrid(x, y, relmargin=.1):
     xrange = [np.min(x) - marginx, np.max(x) + marginx]
     # yrange = [np.min(y) - marginy, np.max(y) + marginy] 
     yrange = [np.min(y) - marginy - .15, np.max(y) + marginy] 
-    return np.mgrid[xrange[0]:xrange[1]:100j, yrange[0]:yrange[1]:100j]
+    return np.mgrid[xrange[0]:xrange[1]:500j, yrange[0]:yrange[1]:500j]
 
 #############################################################
 def get_shp_points(shppath):
