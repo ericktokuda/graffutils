@@ -392,15 +392,15 @@ def calculate_correlations(dfclulabels, accessibpath, outdir, kdeparam='scott'):
     corsdf.to_csv(pjoin(outdir, 'corrs.csv'))
 
 ##########################################################
-def plot_count_vs_accessib(dfclulabels, accessibpath, outdir, kdeparam='scott'):
+def plot_count_vs_accessib(dfclulabels, accessibpath, outdir, kdebw='scott'):
     """Plot count of graffiti vs accessibility for each node of the graph"""
     info(inspect.stack()[0][3] + '()')
 
     dfaccessib = pd.read_csv(accessibpath)
 
     graffloc = np.vstack([dfclulabels.x, dfclulabels.y])
-    if kdeparam < 0: kdebw = 'scott'
-    else: kdebw = kdeparam
+    # if kdeparam < 0: kdebw = 'scott'
+    # else: kdebw = kdeparam
     kernel = stats.gaussian_kde(graffloc, bw_method=kdebw)
     info('KERNEL dim:{}, n:{}, neff:{}, factor:{}, cov:{}'.format(
         kernel.d, kernel.n, kernel.neff, kernel.factor, kernel.covariance))
@@ -421,18 +421,19 @@ def plot_count_vs_accessib(dfclulabels, accessibpath, outdir, kdeparam='scott'):
         # k = k[inds]
         # acc = acc[inds]
 
-        corr, pvalue = scipy.stats.pearsonr(k, acc)
+        inds = np.argwhere(~np.isnan(acc)).flatten()
+        corr, pvalue = scipy.stats.pearsonr(k[inds], acc[inds])
         nrows = 1;  ncols = 1
         figscale = 5
         fig, axs = plt.subplots(nrows, ncols,
                     figsize=(1.2*figscale, nrows*figscale))
-        axs.scatter(k, acc, s=4, alpha=0.2)
+        axs.scatter(k[inds], acc[inds], s=4, alpha=0.2)
         info('{} corr:{}'.format(col, corr))
         axs.set_xlabel('Graffiti count')
         axs.set_ylabel('Accessibility')
         axs.set_title('Pearson corr:{:.2f}'.format(corr))
         plt.tight_layout(1)
-        plt.savefig(pjoin(outdir, '{}_{:.02f}.png'.format(col, kdebw)))
+        plt.savefig(pjoin(outdir, '{}_{:.02f}.png'.format(col, kernel.factor)))
 
 ##########################################################
 def plot_binned_count_vs_accessib(dfclulabels, accessibpath, outdir, accessib):
@@ -550,12 +551,13 @@ def main():
     # plot_density_pairwise_diff(df, xx, yy, mapx, mapy, args.outdir)
 
     accessibpath = pjoin(args.outdir, 'accessib.csv')
-    # load_accessib_from_dir(args.accessibdir, accessibpath)
-    # for kerbw in kerbws:
-        # plot_count_vs_accessib(df, accessibpath, args.outdir, kerbw)
-        # info('kerbw:{}'.format(kerbw))
+    load_accessib_from_dir(args.accessibdir, accessibpath)
+    for kerbw in kerbws:
+        plot_count_vs_accessib(df, accessibpath, args.outdir, kerbw)
+        info('kerbw:{}'.format(kerbw))
         # calculate_correlations(df, accessibpath, args.outdir, kerbw)
 
+    # plot_count_vs_accessib(df, accessibpath, args.outdir)
     # plot_binned_count_vs_accessib(df, accessibpath, args.outdir,
             # 'accessib20')
     info('Elapsed time:{}'.format(time.time()-t0))
