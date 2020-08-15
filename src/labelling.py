@@ -571,7 +571,7 @@ def plot_venn(labelsclupath, outdir):
     matplotlib_venn.venn3(subsets,
             set_labels = ('TypeA', 'TypeB', 'TypeC'),
             set_colors=palettehex2,
-            alpha=.7
+            alpha=1,
             )
     plt.tight_layout()
     plt.savefig(pjoin(outdir, 'counts_venn.pdf'))
