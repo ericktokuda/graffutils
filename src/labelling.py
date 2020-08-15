@@ -21,7 +21,7 @@ import igraph
 import geopandas as geopd
 import matplotlib_venn
 from src.utils import info, export_individual_axis, hex2rgb
-plt.style.use('seaborn')
+# plt.style.use('seaborn')
 
 palettehex = ['#8dd3c7','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69']
 palette = hex2rgb(palettehex, normalized=True, alpha=1.0)
@@ -549,8 +549,7 @@ def convert_csv_to_annotdir(labelsclu, annotator, outdir):
 
 ##########################################################
 def plot_venn(labelsclupath, outdir):
-    """Plot venn diagram
-    """
+    """Plot venn diagram """
     info(inspect.stack()[0][3] + '()')
     df = pd.read_csv(labelsclupath)
     labels = sorted(np.unique(df.label))
@@ -575,6 +574,7 @@ def plot_venn(labelsclupath, outdir):
     plt.savefig(pjoin(outdir, 'counts_venn.pdf'))
 
 
+#########################################################
 def plot_stacked_bar_types(results, rownames, colnames, colours):
     """Plot each row of result as a horiz stacked bar plot"""
     fig, ax = plt.subplots(figsize=(6, 5))
@@ -583,7 +583,7 @@ def plot_stacked_bar_types(results, rownames, colnames, colours):
     prev = np.zeros(n)
     ps = []
     for j in range(m):
-        p = ax.barh(range(n), results[:, j], left=prev, height=.5,
+        p = ax.barh(range(n), results[:, j], left=prev, height=.6,
                 color=colours[j])
         prev += results[:, j]
         ps.append(p)
@@ -597,73 +597,16 @@ def plot_stacked_bar_types(results, rownames, colnames, colours):
     # ax.set_xticklabels(['{}'.format(int(x*100)) for x in xticks])
     # plt.tight_layout(rect=(.5, .5, .3, .5))
     # plt.tight_layout(w_pad=.5)
+    for spine in ax.spines.values():
+        spine.set_edgecolor('dimgray')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
     ax.set_ylabel('Community')
     # fig.legend(ps, colnames, bbox_to_anchor=[1.05, 0.3])
-    ax.legend(ps, colnames, ncol=len(colnames), bbox_to_anchor=(0.08, 1),
+    ax.legend(ps, colnames, ncol=len(colnames), bbox_to_anchor=(0.09, 1),
           loc='lower left') #, fontsize='small')
-    # plt.tight_layout(5)
-    plt.savefig('/tmp/out.png')
-
-##########################################################
-def plot_fancy_stacked_bar_types(csvpath):
-    """Short description """
-    info(inspect.stack()[0][3] + '()')
-    import numpy as np
-    import matplotlib.pyplot as plt
-
-    category_names = ['Strongly disagree', 'Disagree',
-                      'Neither agree nor disagree', 'Agree', 'Strongly agree']
-    results = {
-        'Question 1': [10, 15, 17, 32, 26],
-        'Question 2': [26, 22, 29, 10, 13],
-        'Question 3': [35, 37, 7, 2, 19],
-        'Question 4': [32, 11, 9, 15, 33],
-        'Question 5': [21, 29, 5, 5, 40],
-        'Question 6': [8, 19, 5, 30, 38]
-    }
-
-
-    def survey(results, category_names):
-        """
-        Parameters
-        ----------
-        results : dict
-            A mapping from question labels to a list of answers per category.
-            It is assumed all lists contain the same number of entries and that
-            it matches the length of *category_names*.
-        category_names : list of str
-            The category labels.
-        """
-        labels = list(results.keys())
-        data = np.array(list(results.values()))
-        data_cum = data.cumsum(axis=1)
-        category_colors = plt.get_cmap('RdYlGn')(
-            np.linspace(0.15, 0.85, data.shape[1]))
-
-        fig, ax = plt.subplots(figsize=(9.2, 5))
-        ax.invert_yaxis()
-        ax.xaxis.set_visible(False)
-        ax.set_xlim(0, np.sum(data, axis=1).max())
-
-        for i, (colname, color) in enumerate(zip(category_names, category_colors)):
-            widths = data[:, i]
-            starts = data_cum[:, i] - widths
-            ax.barh(labels, widths, left=starts, height=0.5,
-                    label=colname, color=color)
-            xcenters = starts + widths / 2
-
-            r, g, b, _ = color
-            text_color = 'white' if r * g * b < 0.5 else 'darkgrey'
-            for y, (x, c) in enumerate(zip(xcenters, widths)):
-                ax.text(x, y, str(int(c)), ha='center', va='center',
-                        color=text_color)
-        ax.legend(ncol=len(category_names), bbox_to_anchor=(0, 1),
-                  loc='lower left', fontsize='small')
-
-        return fig, ax
-
-
-    survey(results, category_names)
+    plt.tight_layout()
     plt.savefig('/tmp/out.png')
 
 ##########################################################
