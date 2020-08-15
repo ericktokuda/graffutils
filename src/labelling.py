@@ -566,10 +566,11 @@ def plot_venn(labelsclupath, outdir):
         partition = [img2id[k] for k in aux]
         subsets.append(set(partition))
 
-    edgecolours = ['#993333', '#339933', '#3366ff']
+    # edgecolours = ['#993333', '#339933', '#3366ff']
+    plt.figure(figsize=(4,3))
     matplotlib_venn.venn3(subsets,
             set_labels = ('TypeA', 'TypeB', 'TypeC'),
-            set_colors=edgecolours,
+            set_colors=palettehex2,
             alpha=.7
             )
     plt.tight_layout()
@@ -609,7 +610,7 @@ def plot_stacked_bar_types(results, rownames, colnames, colours):
     ax.legend(ps, colnames, ncol=len(colnames), bbox_to_anchor=(0.08, 1),
           loc='lower left') #, fontsize='small')
     plt.tight_layout()
-    plt.savefig('/tmp/out.png')
+    plt.savefig('/tmp/out.pdf')
 
 ##########################################################
 def main():
@@ -650,7 +651,7 @@ def main():
     colnames = ['Type A', 'Type B', 'Type C']
     plot_stacked_bar_types(results, rownames, colnames, palettehex2)
     # plot_counts_normalized(outlabelsclu, cluareaspath, args.outdir)
-    # plot_venn(outlabelsclu, args.outdir)
+    plot_venn(x, args.outdir)
 
     info('Elapsed time:{}'.format(time.time()-t0))
 
