@@ -25,6 +25,8 @@ from src.utils import info, export_individual_axis, hex2rgb
 
 palettehex = ['#8dd3c7','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69']
 palette = hex2rgb(palettehex, normalized=True, alpha=1.0)
+palettehex2 = ['#1b9e77','#d95f02','#7570b3','#e7298a']
+palette2 = hex2rgb(palettehex2, normalized=True, alpha=1.0)
 
 ##########################################################
 def plot_types(infomapout, shppath, clulabelspath, outdir):
@@ -577,7 +579,7 @@ def plot_venn(labelsclupath, outdir):
 #########################################################
 def plot_stacked_bar_types(results, rownames, colnames, colours):
     """Plot each row of result as a horiz stacked bar plot"""
-    fig, ax = plt.subplots(figsize=(6, 5))
+    fig, ax = plt.subplots(figsize=(5, 4))
     n, m = results.shape
 
     prev = np.zeros(n)
@@ -604,7 +606,7 @@ def plot_stacked_bar_types(results, rownames, colnames, colours):
     ax.spines['left'].set_visible(False)
     ax.set_ylabel('Community')
     # fig.legend(ps, colnames, bbox_to_anchor=[1.05, 0.3])
-    ax.legend(ps, colnames, ncol=len(colnames), bbox_to_anchor=(0.09, 1),
+    ax.legend(ps, colnames, ncol=len(colnames), bbox_to_anchor=(0.08, 1),
           loc='lower left') #, fontsize='small')
     plt.tight_layout()
     plt.savefig('/tmp/out.png')
@@ -646,7 +648,7 @@ def main():
 
     rownames = [ 'C{}'.format(i) for i in clus]
     colnames = ['Type A', 'Type B', 'Type C']
-    plot_stacked_bar_types(results, rownames, colnames, palettehex[2:])
+    plot_stacked_bar_types(results, rownames, colnames, palettehex2)
     # plot_counts_normalized(outlabelsclu, cluareaspath, args.outdir)
     # plot_venn(outlabelsclu, args.outdir)
 
