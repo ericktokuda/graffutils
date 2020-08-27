@@ -22,11 +22,15 @@ import geopandas as geopd
 import matplotlib_venn
 from src.utils import info, export_individual_axis, hex2rgb
 # plt.style.use('seaborn')
+from myutils import graph
 
 palettehex = ['#8dd3c7','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69']
 palette = hex2rgb(palettehex, normalized=True, alpha=1.0)
 palettehex2 = ['#1b9e77','#d95f02','#7570b3','#e7298a']
 palette2 = hex2rgb(palettehex2, normalized=True, alpha=1.0)
+palettehex3 = ['#e41a1c','#377eb8','#e6e600','#984ea3','#ff7f00','#4daf4a','#a65628','#f781bf','#999999']
+palette3 = hex2rgb(palettehex3, normalized=True, alpha=.7)
+palette3[5,3] = 1.0
 
 ##########################################################
 def plot_types(infomapout, shppath, clulabelspath, outdir):
@@ -50,11 +54,8 @@ def plot_types(infomapout, shppath, clulabelspath, outdir):
     markers = ['$A$', '$B$', '$C$']
     ss = [30, 35, 35]
     edgecolours = ['#993333', '#339933', '#3366ff']
-    # edgecolours = ['#0000FF', '#FF0000', '#00FF00']
     visual = [ dict(marker=m, s=s, edgecolors=e) for m,s,e in \
-              # zip(['x', '^', 'o'], ss, edgecolours)]
               zip(['o', 'o', 'o'], ss, edgecolours)]
-              # zip(markers, ss, edgecolours)]
 
     for i, l in enumerate(labels):
         data = df[df.label == l]
@@ -67,224 +68,12 @@ def plot_types(infomapout, shppath, clulabelspath, outdir):
     
     fig.patch.set_visible(False)
     ax[0, 0].axis('off')
-    # -46.826198999999995 -46.36508400000003 -24.008430999701822 -23.356292999687376
 
     ax[0, 0].legend(loc=(0.6, 0.12), title='Graffiti types',
                     fontsize='xx-large', title_fontsize='xx-large')
 
     extent = ax[0, 0].get_window_extent().transformed(fig.dpi_scale_trans.inverted())
     fig.savefig(pjoin(outdir, 'map_types.pdf'), bbox_inches=extent.expanded(1.0, 1.0))
-    fig.savefig(pjoin(outdir, 'map_types.png'), bbox_inches=extent.expanded(1.0, 1.0))
-
-##########################################################
-def plot_communities(infomapout, graphmlpath, shppath, outdir):
-    """Plot infomap output """
-    info(inspect.stack()[0][3] + '()')
-    colours = palette
-    fig, ax = plt.subplots(1, 1, figsize=(15/2, 9), squeeze=False) # Plot contour
-
-    g = igraph.Graph.Read(graphmlpath)
-    g.simplify()
-    g.to_undirected()
-    coords = [(float(x), -float(y)) for x, y in zip(g.vs['x'], g.vs['y'])]
-
-    fh = open(infomapout)
-    lines = fh.read().strip().split('\n')
-
-    aux = np.zeros(g.vcount())
-    for l in lines[2:]:
-        arr = l.split(' ')
-        aux[int(arr[0])-1] = int(arr[1])
-    g.vs['clustid'] = aux
-    fh.close()
-
-    info('Clusters found in infomap: {}'.format(np.unique(g.vs['clustid'])))
-
-    for attr in ['ref', 'highway', 'osmid', 'id']:
-        del(g.vs[attr])
-    for attr in g.es.attributes():
-        del(g.es[attr])
-
-    coords = [(float(x), -float(y)) for x, y in zip(g.vs['x'], g.vs['y'])]
-    coordsnp = np.array([[float(x), float(y)] for x, y in zip(g.vs['x'], g.vs['y'])])
-    # vcolours = [palette[int(v['clustid']-1)] for v in g.vs() ]
-
-    clustids = np.array(g.vs['clustid']).astype(int)
-    ecolours = np.zeros((g.ecount(), 4), dtype=float)
-    lines = np.zeros((g.ecount(), 2, 2), dtype=float)
-
-    for i, e in enumerate(g.es()):
-        srcid = int(e.source)
-        tgtid = int(e.target)
-
-        ecolours[i, :] = palette[int(g.vs[srcid]['clustid'])-1]
-
-        if g.vs[tgtid]['clustid'] != g.vs[tgtid]['clustid']:
-            ecolours[i, 3] = 0.0
-
-        lines[i, 0, 0] = g.vs[srcid]['x']
-        lines[i, 0, 1] = g.vs[srcid]['y']
-        lines[i, 1, 0] = g.vs[tgtid]['x']
-        lines[i, 1, 1] = g.vs[tgtid]['y']
-
-    lc = mc.LineCollection(lines, colors=ecolours, linewidths=0.5)
-    ax[0, 0].add_collection(lc)
-    ax[0, 0].autoscale()
-
-    geodf = geopd.read_file(shppath)
-    shapefile = geodf.geometry.values[0]
-    xs, ys = shapefile.exterior.xy
-    ax[0, 0].plot(xs, ys, c='dimgray')
-    
-    fig.patch.set_visible(False)
-    ax[0, 0].axis('off')
-    plt.tight_layout(pad=10)
-
-    handles = []
-    for i, p in enumerate(palette):
-        handles.append(mpatches.Patch(color=palette[i, :], label='C'+str(i+1)))
-
-    # plt.legend(handles=handles)
-    ax[0, 0].legend(handles=handles, loc=(.6, .09), title='Communities',
-                    fontsize='xx-large', title_fontsize='xx-large')
-
-    extent = ax[0, 0].get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-    fig.savefig(pjoin(outdir, 'map_comm.pdf'), bbox_inches=extent.expanded(1.0, 1.0))
-    fig.savefig(pjoin(outdir, 'map_comm.png'), bbox_inches=extent.expanded(1.0, 1.0))
-
-##########################################################
-def plot_proportion_per_cluster(clulabelspath, outdir):
-    """Plot cluster labels.
-    It expects a df with the points and corresponding cluster, objlabel
-    and also a list of the areas of each cluster.
-    """
-
-    info(inspect.stack()[0][3] + '()')
-
-    df = pd.read_csv(clulabelspath, index_col='id')
-    totalrows = len(df)
-
-    clusters = np.unique(df.cluster)
-    clusters_str = ['c{}'.format(cl) for cl in clusters]
-    nclusters = len(clusters)
-    labels = np.unique(df.label)
-    nlabels = len(labels)
-    labelstr = [str(l) for l in labels]
-    plotsize = 5
-
-    colours = palette
-
-    coloursrev = []
-    for i in range(len(colours)):
-        coloursrev.append(colours[len(colours) - 1 - i, :])
-
-    # Plot by type
-    fig, ax = plt.subplots(1, nlabels,
-                           figsize=(nlabels*plotsize, .8*plotsize),
-                           squeeze=False)
-
-    clustersums = np.zeros((nclusters, nlabels))
-    for i, cl in enumerate(clusters):
-        aux = df[df.cluster == cl]
-        for j, l in enumerate(labels):
-            clustersums[i, j] = len(aux[aux.label == l])
-
-    info('clustersums:{}'.format(np.sum(clustersums, axis=1)))
-    
-    labelsmap = {1: 'A', 2: 'B', 3: 'C'}
-    for i, l in enumerate(labels):
-        data = df[df.label == l]
-        ys = np.zeros(nclusters)
-        labelsum = len(data)
-        for k, cl in enumerate(clusters):
-            ys[k] = len(data[data.cluster == cl])
-
-        barplot = ax[0, i].barh(list(reversed(clusters_str)), list(reversed(ys)),
-                                color=coloursrev)
-        # barplot = ax[0, i].barh(list(reversed(clusters_str)), list(reversed(ys)))
-                                # color=coloursrev)
-
-        # ax[0, i].set_xlim(0, 1)
-        ax[0, i].set_title('Ratio of Type {} within communities'.\
-                            format(r"$\bf{" + str(labelsmap[l]) + "}$"),
-                           size='large', pad=30)
-        # ax[0, i].xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
-        # ax[0, i].set_xticks([0, .25, 0.5, .75, 1.0])
-        ax[0, i].spines['top'].set_color('gray')
-        ax[0, i].xaxis.set_ticks_position('top')
-        ax[0, i].tick_params(axis='x', which='both', length=0)
-                    # , colors='gray', labelsize='large')
-        ax[0, i].tick_params(axis='y', which='both', labelsize='large')
-        ax[0, i].xaxis.grid(True, alpha=0.4)
-        ax[0, i].set_axisbelow(True)
-        ax[0, i].set_ylabel('Community')
-        ax[0, i].xaxis.set_label_position('top')
-        ax[0, i].set_xlabel('Graffiti type {} count'.format(l))
-
-        def autolabel(rects, ys):
-            for idx, rect in enumerate(rects):
-                height = rect.get_height()
-                delta = np.max(ys) / 20
-                ax[0, i].text(rect.get_width() - delta,
-                              rect.get_y() + rect.get_height()/2.-0.28,
-                              '{}%'.format(int(ys[idx]/labelsum * 100)), color='white',
-                              ha='center', va='bottom', rotation=0,)
-                              # fontsize='large')
-
-        autolabel(barplot, list(reversed(ys)))
-        # ax[0, i].axis("off")
-        for spine in ax[0, i].spines.values():
-            spine.set_edgecolor('dimgray')
-        ax[0, i].spines['bottom'].set_visible(False)
-        ax[0, i].spines['right'].set_visible(False)
-        ax[0, i].spines['left'].set_visible(False)
-
-    plt.tight_layout(pad=5)
-    export_individual_axis(ax, fig, labelstr, outdir, pad=0.5,
-            prefix='bar_type', fmt='pdf')
-    plt.savefig(pjoin(outdir, 'count_per_type.pdf'))
-
-##########################################################
-def plot_proportion_per_cluster2(clulabelspath, outdir):
-    """Plot cluster labels.
-    It expects a df with the points and corresponding cluster, objlabel
-    and also a list of the areas of each cluster.
-    """
-
-    info(inspect.stack()[0][3] + '()')
-
-    df = pd.read_csv(clulabelspath, index_col='id')
-    totalrows = len(df)
-
-    clusters = np.unique(df.cluster)
-    clusters_str = ['c{}'.format(cl) for cl in clusters]
-    nclusters = len(clusters)
-    labels = np.unique(df.label)
-    nlabels = len(labels)
-    labelstr = [str(l) for l in labels]
-    plotsize = 5
-
-    data = {}
-    for l in labels:
-        data[str(l)] = df[df.label == l].groupby('cluster').sum()['label'].values
-    
-    df = pd.DataFrame.from_dict(data)
-    
-    df['community'] = df.index
-    
-    pd.plotting.parallel_coordinates(
-        df, 'community',
-        )
-        # color=('#556270', '#4ECDC4', '#C7F464'))
-    ax = plt.gca()
-    ax.set_xlabel('Graffiti type')
-    ax.set_ylabel('Number of occurrences')
-    # ax.legend()
-    # leg = ax.get_legend()
-    breakpoint()
-    
-    plt.savefig('/tmp/parallel.png')
-
 
 ##########################################################
 def plot_counts_normalized(clulabelspath, cluareaspath, outdir):
@@ -343,8 +132,7 @@ def plot_counts_normalized(clulabelspath, cluareaspath, outdir):
 
 ##########################################################
 def count_labels_per_region(df, clusters, labels, cluids):
-    """Count number of labels per region
-    """
+    """Count number of labels per region """
     nlabels = len(labels)
     nclusters = len(clusters)
 
@@ -359,29 +147,9 @@ def count_labels_per_region(df, clusters, labels, cluids):
             counts[i, j] = counts_reg[ind]
     return counts
 
-##########################################################
-def count_shuffled_labels_per_region(dforig, clusters, labels, cluids, nrealizations):
-    """Shuffle and count for @nrealizations times
-    Returns an array indexed by the nrealization, regionid, objtype
-    """
-    info(inspect.stack()[0][3] + '()')
-
-    counts_perm = np.ones((nrealizations, len(clusters), len(labels)),
-                             dtype=float) * 999
-
-    for i in range(nrealizations):
-        df = dforig.copy()
-        newlabels = df.label.copy().values
-        np.random.shuffle(newlabels)
-        
-        df['label'] = newlabels
-        counts_perm[i, :, :] = count_labels_per_region(df, clusters, labels, cluids)
-    return counts_perm
-
 #############################################################
 def shuffle_labels(labelspath, outdir):
-    """Shuffle labels from @labelspath and compute metrics
-    """
+    """Shuffle labels from @labelspath and compute metrics """
     info(inspect.stack()[0][3] + '()')
     df = pd.read_csv(labelspath, index_col='id')
 
@@ -405,56 +173,8 @@ def shuffle_labels(labelspath, outdir):
             nlabels, outdir)
 
 ##########################################################
-def plot_shuffle_distrib_and_orig(counts_orig, counts_perm, nclusters,
-        nlabels, outdir):
-    """Plot shuffle counts distribs and original counts """
-    info(inspect.stack()[0][3] + '()')
-    nperregion = np.sum(counts_orig, axis=1)
-    plotsize = 5
-    fig, ax = plt.subplots(1, nclusters,
-                           figsize=(nclusters*plotsize, 1*plotsize),
-                           squeeze=False)
-
-    palette = np.array([
-        [127,201,127, 255],
-        [190,174,212, 255],
-        [253,192,134, 255],
-        [255,255,153, 255],
-    ])
-    palette = palette / 255
-
-    for j in range(nclusters):
-        for k in range(nlabels):
-            data = counts_perm[:, j, k] / nperregion[j]
-            density = stats.gaussian_kde(data)
-            # density = gaussian_kde(data)
-            xs = np.linspace(0, 1, num=100)
-            density.covariance_factor = lambda : .25
-            density._compute_covariance()
-            ys = density(xs)
-            ys /= np.sum(ys)
-            ax[0, j].plot(xs, ys, label=str(k), c=palette[k])
-
-            count_ref = counts_orig[j, k] / nperregion[j]
-            ax[0, j].scatter(count_ref, 0, c=[palette[k]])
-            plt.text(0.5, 0.9, 'samplesz:{:.0f}'.format(nperregion[j]),
-                     horizontalalignment='center', verticalalignment='center',
-                     fontsize='large', transform = ax[0, j].transAxes)
-
-
-        ax[0, j].legend()
-        ax[0, j].set_xlabel('Graffiti relative count')
-    
-    fig.suptitle('Distrubution of number of graffiti occurences '\
-                    'per type (colours) and per cluster (plots)')
-
-    print(nperregion)
-    plt.savefig(pjoin(outdir, 'counts_shuffled_norm.pdf'))
-
-##########################################################
 def compile_lists(listsdir, labelspath):
-    """Compile lists (.lst) in @listdir
-    """
+    """Compile lists (.lst) in @listdir """
     info(inspect.stack()[0][3] + '()')
     files = sorted(os.listdir(listsdir))
 
@@ -473,11 +193,15 @@ def compile_lists(listsdir, labelspath):
     df.to_csv(labelspath, index_label='id',)
 
 #############################################################
-def summarize_annotations(annotdir, labelspath):
+def compile_labels(annotdir, labelspath):
     """Summarize @annotdir csv annotations in .txt format and output
-    summary to @labelspath
-    """
+    summary to @labelspath """
     info(inspect.stack()[0][3] + '()')
+
+    if os.path.exists(labelspath):
+        info('Loading {}'.format(labelspath))
+        return pd.read_csv(labelspath)
+
     files = sorted(os.listdir(annotdir))
 
     labels = '1 2 3'.split(' ')
@@ -497,25 +221,25 @@ def summarize_annotations(annotdir, labelspath):
 
     df = pd.DataFrame(data, columns=cols)
     df.to_csv(labelspath, index_label='id',)
+    return df
 
 ##########################################################
-def parse_infomap_output(graphmlpath, infomapout, labelspath, annotator, outpath):
-    """Find enclosing community given by @infomapout of each node in @graphml
-    """
+def parse_infomap_results(graphml, infomapout, labelsdf, annotator, outpath):
+    """Find enclosing community given by @infomapout of each node in @graphml """
     info(inspect.stack()[0][3] + '()')
 
-    g = igraph.Graph.Read(graphmlpath)
+    if os.path.exists(outpath):
+        return pd.read_csv(outpath)
+
+    g = graph.simplify_graphml(graphml, directed=True, simplify=True)
     cludf = pd.read_csv(infomapout, sep=' ', skiprows=[0, 1],
                      names=['id', 'cluster','flow']) # load graph clusters
     cludf = cludf.sort_values(by=['id'], inplace=False)
 
-    objsdf = pd.read_csv(labelspath, index_col='id') # load obj labels
-    pd.set_option("display.precision", 8)
-
-    coords_objs = np.zeros((len(objsdf), 2))
+    coords_objs = np.zeros((len(labelsdf), 2))
     
     i = 0
-    for _, row in objsdf.iterrows():
+    for _, row in labelsdf.iterrows():
         coords_objs[i, 0] = row.x
         coords_objs[i, 1] = row.y
         i += 1
@@ -524,14 +248,14 @@ def parse_infomap_output(graphmlpath, infomapout, labelspath, annotator, outpath
 
     kdtree = cKDTree(coords_nodes)
     dists, inds = kdtree.query(coords_objs)
-    objsdf['cluster'] = np.array(cludf.cluster.tolist())[inds]
-    objsdf['annotator'] = annotator
-    objsdf.to_csv(outpath)
+    labelsdf['cluster'] = np.array(cludf.cluster.tolist())[inds]
+    # labelsdf['annotator'] = annotator
+    labelsdf.to_csv(outpath, index=False, float_format='%.08f')
+    return labelsdf
 
 ##########################################################
 def convert_csv_to_annotdir(labelsclu, annotator, outdir):
-    """Convert dataframe in @labelsclu from @annotator to txt format in @outdir
-    """
+    """Convert dataframe in @labelsclu from @annotator to txt format in @outdir """
     info(inspect.stack()[0][3] + '()')
     df = pd.read_csv(labelsclu)
     labels = np.unique(df.label)
@@ -568,26 +292,35 @@ def plot_venn(labelsclupath, outdir):
 
     # edgecolours = ['#993333', '#339933', '#3366ff']
     plt.figure(figsize=(4,3))
+    # cl = [[167/255, 167/255, 167/255, 1.0]] * 3
+    cl = [[114/255, 105/255, 121/255, 1.0]] * 3
+    
     matplotlib_venn.venn3(subsets,
             set_labels = ('TypeA', 'TypeB', 'TypeC'),
-            set_colors=palettehex2,
-            alpha=1,
+            # set_colors=palettehex3[6:],
+            set_colors=cl,
+            alpha=.7,
             )
     plt.tight_layout()
     plt.savefig(pjoin(outdir, 'counts_venn.pdf'))
 
 
 #########################################################
-def plot_stacked_bar_types(results, rownames, colnames, colours):
+def plot_stacked_bar_types(results, nclusters, nlabels,
+        colours, outdir):
     """Plot each row of result as a horiz stacked bar plot"""
     fig, ax = plt.subplots(figsize=(5, 4))
     n, m = results.shape
+
+    letters = 'ABCDE'
+    rownames = [ 'C{}'.format(i+1) for i in range(nclusters)]
+    colnames = [ 'Type {}'.format(letters[i]) for i in range(nlabels)]
 
     prev = np.zeros(n)
     ps = []
     for j in range(m):
         p = ax.barh(range(n), results[:, j], left=prev, height=.6,
-                color=colours[j])
+                color=colours[6+j])
         prev += results[:, j]
         ps.append(p)
 
@@ -596,21 +329,27 @@ def plot_stacked_bar_types(results, rownames, colnames, colours):
     ax.grid(False)
     ax.set_xlabel('Ratio')
     xticks = np.array([0, .2, .4, .6, .8, 1.0])
-    # ax.set_xticks(xticks)
-    # ax.set_xticklabels(['{}'.format(int(x*100)) for x in xticks])
-    # plt.tight_layout(rect=(.5, .5, .3, .5))
-    # plt.tight_layout(w_pad=.5)
     for spine in ax.spines.values():
         spine.set_edgecolor('dimgray')
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.spines['left'].set_visible(False)
     ax.set_ylabel('Community')
-    # fig.legend(ps, colnames, bbox_to_anchor=[1.05, 0.3])
     ax.legend(ps, colnames, ncol=len(colnames), bbox_to_anchor=(0.08, 1),
           loc='lower left') #, fontsize='small')
     plt.tight_layout()
-    plt.savefig('/tmp/out.pdf')
+    plt.savefig(pjoin(outdir, 'ratio_bars.pdf'))
+
+##########################################################
+def get_ratios_by_community(labelsdf, clusters, normalized=True):
+    """Get ratio for each community """
+    info(inspect.stack()[0][3] + '()')
+    results = np.zeros((len(clusters), len(np.unique(labelsdf.label))))
+    for i, cl in enumerate(clusters):
+        results[i, :] = labelsdf[labelsdf.cluster == cl]. \
+                groupby('label').sum().cluster.values
+    if normalized: results = results / np.sum(results, axis=1).reshape(-1, 1)
+    return results
 
 ##########################################################
 def main():
@@ -627,31 +366,21 @@ def main():
     clupath = './data/20200202-types/20200222-infomap.clu'
     shppath = './data/20200202-types/20200224-shp/'
     cluareaspath = './data/20200202-types/20200222-infomap_areas.csv'
-
     outlabels = pjoin(args.outdir, 'labels.csv')
-    # outlabelsclu = pjoin(args.outdir, 'labels_and_clu_nodupls.csv')
-    # outlabelsclu = pjoin(args.outdir, 'labels_and_clu_nodupls.csv')
-    annotator = 'er'
+    outlabelsclu = 'data/labels_and_clu_nodupls.csv'
 
-    # summarize_annotations(annotdir, outlabels)
-    # parse_infomap_output(graphmlpath, clupath, outlabels,
-            # annotator, outlabelsclu)
+    # labelsdf = compile_labels(annotdir, outlabels) # Do this for each annotator
+    # labelsdf = parse_infomap_results(graphmlpath, clupath, labelsdf,
+            # 'er', outlabelsclu)
+
     # plot_types(clupath, shppath, outlabelsclu, args.outdir)
-    # plot_communities(clupath, graphmlpath, shppath, args.outdir)
-    # plot_proportion_per_cluster2(outlabelsclu, args.outdir)
-    x = '/home/dufresne/temp/graffiti/20200202-types/20200601-combine_me_he/labels_and_clu_nodupls.csv'
-    df = pd.read_csv(x)
-    clus = sorted(np.unique(df.cluster))
-    results = np.zeros((len(clus), len(np.unique(df.label))))
-    for i, cl in enumerate(clus):
-        results[i, :] = df[df.cluster == cl].groupby('label').sum().cluster.values
-    results = results / np.sum(results, axis=1).reshape(-1, 1)
-
-    rownames = [ 'C{}'.format(i) for i in clus]
-    colnames = ['Type A', 'Type B', 'Type C']
-    plot_stacked_bar_types(results, rownames, colnames, palettehex2)
+    # clus = sorted(np.unique(labelsdf.cluster))
+    # lbls = sorted(np.unique(labelsdf.label))
+    # results = get_ratios_by_community(labelsdf, clus, normalized=True)
+    # plot_stacked_bar_types(results, len(clus), len(lbls),
+            # palettehex3, args.outdir)
     # plot_counts_normalized(outlabelsclu, cluareaspath, args.outdir)
-    plot_venn(x, args.outdir)
+    # plot_venn(outlabelsclu, args.outdir)
 
     info('Elapsed time:{}'.format(time.time()-t0))
 
