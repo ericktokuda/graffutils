@@ -25,8 +25,9 @@ from src.utils import info, export_individual_axis, hex2rgb
 # plt.style.use('seaborn')
 from myutils import graph, geo
 import scipy
+import scipy.spatial
 from numba import jit
-import pickle as pkl
+import pickle
 
 palettehex = ['#8dd3c7','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69']
 palette = hex2rgb(palettehex, normalized=True, alpha=1.0)
@@ -618,6 +619,7 @@ def get_knn_ratios(labelsdf, vcoords, k, outdir):
         for _ind, _count in zip(counts[0], counts[1]):
             arrayid = _ind - 1 # 0-based index
             ratios[i, arrayid] = _count
+        # if i > 1000: break
 
     ratios /= k
     df = pd.DataFrame(ratios)
@@ -655,72 +657,74 @@ def test_multivariate_normal(x):
 ##########################################################
 def find_tile_idx(pt, xx, yy, dx, dy):
     """Find tile index """
-    # info(inspect.stack()[0][3] + '()')
     gridmin = np.array([xx[0, 0], yy[0, 0]])
     delta = pt - gridmin
     return int(delta[0] // dx), int(delta[1] // dy)
 
 ##########################################################
-def gaussian_smooth_all(xx, yy, vcoords, ratios, radius, nsigma, outdir):
+def gaussian_smooth(coords, vcoords, ratios, radius, nsigma, outpath):
     """Gaussian smooth for every type"""
     info(inspect.stack()[0][3] + '()')
-    for j in range(ratios.shape[1]):
-        gaussian_smooth(xx, yy, vcoords, ratios[:, j], radius,
-                nsigma, str(j), outdir)
+
+    if os.path.exists(outpath):
+        return pickle.load(open(outpath, 'rb'))
+
+    epsilon = .00001
+    r_neigh = np.max(radius) + epsilon # ball to consider gaussian contributions
+
+    tree = cKDTree(vcoords)
+    funcs = np.ndarray(len(vcoords), dtype=object)
+
+    g = np.zeros(len(coords), dtype=float)
+
+    for i in range(len(vcoords)): # parameterized gaussians functions
+        sigma = radius[i] / nsigma
+        cov = np.eye(2) * (sigma**2)
+        funcs[i] = lambda x: multivariate_normal(x, vcoords[i, :], cov) * ratios[i]
+
+    for i in range(len(coords)): # filtering by...
+        info('i:{}'.format(i))
+        c0 = np.array([coords[i, :]]) # ...distance
+        inds = np.array(tree.query_ball_point([c0], r_neigh)[0][0])
+        if len(inds) == 0: continue
+        dist = scipy.spatial.distance.cdist(vcoords[inds, :], c0)
+        _inds = np.where(dist[:, -1] < radius[inds])[0] # ...radius
+        neighids = inds[_inds]
+
+        for neighid in neighids:
+            g[i] += funcs[neighid](c0[0])
+
+    pickle.dump(g, open(outpath, 'wb'))
+    return g
+
 
 ##########################################################
-# @jit
-def gaussian_smooth(xx, yy, vcoords, ratios, radius, nsigma, id, outdir):
-    """Gaussian smooth, given the ratios of a type"""
-    # info(inspect.stack()[0][3] + '()')
+def gaussian_smooth_all(coords, vcoords, ratiosall, radius, nsigma, outdir, suff=''):
+    nratios = ratiosall.shape[1]
+    gs = []
+    for i in range(nratios):
+        outpath = pjoin(outdir, 'gaussian_{}{}.pkl'.format(suff, i))
+        g = gaussian_smooth(coords, vcoords,
+                ratiosall[:, i], radius, nsigma, outpath)
+        gs.append(g)
+    return gs
 
-    dx = xx[1, 0] - xx[0, 0]; dy = yy[0, 1] - yy[0, 0];
-    ntilesx, ntilesy = xx.shape
+##########################################################
+def plot_gaussians(gins, n, outdir):
+    for i, gin in enumerate(gins):
+        fig, ax = plt.subplots(figsize=(10, 10))
+        outpath = pjoin(outdir, 'gaussian_{}.png'.format(i))
+        g = gin.reshape(n, n)
+        im = ax.imshow(g.T)
+        fig.colorbar(im)
+        plt.savefig(outpath)
 
-    z = np.zeros(xx.shape)
-    for i, c0 in enumerate(vcoords): # For each vertex c0
-        ratio = ratios[i]
-        factor = ratio * (dx * dy) # We multiply by the area to avoid \
-        kerradius = radius[i] # getting a too large number
-        tilei, tilej = find_tile_idx(c0, xx, yy, dx, dy)
-        tilecoord = np.array([xx[tilei, tilej], yy[tilei, tilej]])
-
-        sigma = kerradius / nsigma
-        sigma2 = sigma**2
-        f = lambda x: multivariate_normal(x, tilecoord, np.eye(2)*sigma2)
-
-        tileidx = np.array([tilei, tilej])
-        m = np.array([int(kerradius // dx) + 1, int(kerradius // dy) + 1])
-
-        rangemin = tileidx - m
-        rangemax = tileidx + m + 1
-        rangemin[rangemin < 0] = 0 #When radius stretches outsidethe border
-        rangemax[rangemax > ntilesx] = ntilesx
-
-        # - flatten 3*sigma window centered in c0 elements
-        xxx = xx[rangemin[0]:rangemax[0], rangemin[1]:rangemax[1]].flatten()
-        yyy = yy[rangemin[0]:rangemax[0], rangemin[1]:rangemax[1]].flatten()
-
-        for ii in range(rangemin[0], rangemax[0]):
-            for jj in range(rangemin[1], rangemax[1]):
-                z[ii, jj] += f([xx[ii, jj], yy[ii, jj]]) * factor
-                
-        # if i > 10: break
-
-    figsize = 8
-    fig, ax = plt.subplots(figsize=(figsize, figsize))
-    im = ax.imshow(z.T, origin='lower')
-    fig.colorbar(im)
-    plt.savefig(pjoin(outdir, '{}_ratios.png'.format(id)))
-    plt.savefig(pjoin(outdir, '{}_ratios.pdf'.format(id)))
-
-    pkl.dump(z, open(pjoin(outdir, 'raw.pkl'), 'wb'))
-
-    fig, ax = plt.subplots(figsize=(figsize, figsize))
-    im = ax.imshow(np.log(z.T+.0001), origin='lower')
-    fig.colorbar(im)
-    plt.savefig(pjoin(outdir, '{}_logratios.png'.format(id)))
-    plt.savefig(pjoin(outdir, '{}_logratios.pdf'.format(id)))
+        fig, ax = plt.subplots(figsize=(10, 10))
+        outpath = pjoin(outdir, 'gaussian_log{}.png'.format(i))
+        g = gin.reshape(n, n)
+        im = ax.imshow(np.log(g.T+.0001), origin='lower')
+        fig.colorbar(im)
+        plt.savefig(outpath)
 
 ##########################################################
 def main():
@@ -761,7 +765,7 @@ def main():
 
     # Kernel density estimation
     info('Elapsed time:{}'.format(time.time()-t0))
-    ntilesx = ntilesy = 10000
+    ntilesx = ntilesy = 500
     xx, yy, dx, dy = create_meshgrid(labelsdf.x, labelsdf.y,
             nx=ntilesx, ny=ntilesy, relmargin=.1)
 
@@ -769,7 +773,14 @@ def main():
     nneighbours = 10
 
     ratios, radius = get_knn_ratios(labelsdf, vcoords, nneighbours, args.outdir)
-    gaussian_smooth_all(xx, yy, vcoords, ratios, radius, nsigma, args.outdir)
+
+    gs = gaussian_smooth_all(vcoords, vcoords, ratios, radius, nsigma,
+            args.outdir, suff='vcoords_') # for vertex coords
+
+    coords = np.concatenate([xx.reshape(-1, 1), yy.reshape(-1, 1)], axis=1)
+    gs = gaussian_smooth_all(coords, vcoords, ratios, radius, nsigma,
+            args.outdir, suff='tiles_')
+    plot_gaussians(gs, ntilesx, args.outdir)
 
     # kerbw = .3
     # pdf, _ = compute_pdf_over_grid(labelsdf.x, labelsdf.y, xx, yy, kerbw)
