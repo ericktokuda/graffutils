@@ -26,6 +26,7 @@ from src.utils import info, export_individual_axis, hex2rgb
 from myutils import graph, geo
 import scipy
 from numba import jit
+import pickle as pkl
 
 palettehex = ['#8dd3c7','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69']
 palette = hex2rgb(palettehex, normalized=True, alpha=1.0)
@@ -605,7 +606,7 @@ def get_knn_ratios(labelsdf, vcoords, k, outdir):
     # c0 = [-46.6333, -23.5505] # Sao paulo
     # distsall, indsall = tree.query([c0], k=3)
 
-    distsall, indsall = tree.query(vcoords, k=3)
+    distsall, indsall = tree.query(vcoords, k=k)
     radius = np.zeros(nvertices, dtype=float)
     ratios = np.zeros((nvertices, len(labels)), dtype=float)
 
@@ -679,8 +680,8 @@ def gaussian_smooth(xx, yy, vcoords, ratios, radius, nsigma, id, outdir):
     z = np.zeros(xx.shape)
     for i, c0 in enumerate(vcoords): # For each vertex c0
         ratio = ratios[i]
-        factor = ratio * (dx * dy) # We multiply by the area to avoid getting
-        kerradius = radius[i] # too large number
+        factor = ratio * (dx * dy) # We multiply by the area to avoid \
+        kerradius = radius[i] # getting a too large number
         tilei, tilej = find_tile_idx(c0, xx, yy, dx, dy)
         tilecoord = np.array([xx[tilei, tilej], yy[tilei, tilej]])
 
@@ -704,7 +705,7 @@ def gaussian_smooth(xx, yy, vcoords, ratios, radius, nsigma, id, outdir):
             for jj in range(rangemin[1], rangemax[1]):
                 z[ii, jj] += f([xx[ii, jj], yy[ii, jj]]) * factor
                 
-        # if i > 1000: break
+        # if i > 10: break
 
     figsize = 8
     fig, ax = plt.subplots(figsize=(figsize, figsize))
@@ -712,6 +713,8 @@ def gaussian_smooth(xx, yy, vcoords, ratios, radius, nsigma, id, outdir):
     fig.colorbar(im)
     plt.savefig(pjoin(outdir, '{}_ratios.png'.format(id)))
     plt.savefig(pjoin(outdir, '{}_ratios.pdf'.format(id)))
+
+    pkl.dump(z, open(pjoin(outdir, 'raw.pkl'), 'wb'))
 
     fig, ax = plt.subplots(figsize=(figsize, figsize))
     im = ax.imshow(np.log(z.T+.0001), origin='lower')
@@ -742,7 +745,7 @@ def main():
     shppath = './data/shp/'
     accpath = './data/accessib/acc15.txt'
 
-    labelsdf = compile_labels(annotdir, outlabels) # Do this for each annotator
+    labelsdf = compile_labels(annotdir, labelsclu) # Do this for each annotator
     labelsdf, vcoords = parse_infomap_results(graphmlpath, clupath, labelsdf,
             'er', labelsclu, vcoordspath)
     
@@ -758,12 +761,12 @@ def main():
 
     # Kernel density estimation
     info('Elapsed time:{}'.format(time.time()-t0))
-    ntilesx = ntilesy = 500
+    ntilesx = ntilesy = 10000
     xx, yy, dx, dy = create_meshgrid(labelsdf.x, labelsdf.y,
             nx=ntilesx, ny=ntilesy, relmargin=.1)
 
-    nsigma = 4
-    nneighbours = 3
+    nsigma = 3
+    nneighbours = 10
 
     ratios, radius = get_knn_ratios(labelsdf, vcoords, nneighbours, args.outdir)
     gaussian_smooth_all(xx, yy, vcoords, ratios, radius, nsigma, args.outdir)

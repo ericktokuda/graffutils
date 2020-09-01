@@ -89,7 +89,7 @@ def download_all(df, quota, outdir):
 
     acc = 0
     for idx, row in df.iterrows():
-        # if idx < 2000: continue
+    # for idx, row in df[::-1].iterrows():
         info('idx:{}'.format(idx))
 
         statusmeta, lonsnap, latsnap = download_metadata(row.lon,
