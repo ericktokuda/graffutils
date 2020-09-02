@@ -28,6 +28,7 @@ import scipy
 import scipy.spatial
 from numba import jit
 import pickle
+from multiprocessing import Pool
 
 palettehex = ['#8dd3c7','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69']
 palette = hex2rgb(palettehex, normalized=True, alpha=1.0)
@@ -700,17 +701,23 @@ def gaussian_smooth(coords, vcoords, ratios, radius, nsigma, outpath):
     pickle.dump(g, open(outpath, 'wb'))
     return g
 
+##########################################################
+def run_experiment_from_list(params):
+    return gaussian_smooth(*params)
 
 ##########################################################
-def gaussian_smooth_all(coords, vcoords, ratiosall, radius, nsigma, outdir, suff=''):
+def gaussian_smooth_all(coords, vcoords, ratiosall, radius, nsigma,
+        outdir, suff='', nprocs=1):
     nratios = ratiosall.shape[1]
     gs = []
-    for i in range(nratios):
+
+    params = []
+    for i in range(ratiosall.shape[1]):
         outpath = pjoin(outdir, 'gaussian_{}{}.pkl'.format(suff, i))
-        g = gaussian_smooth(coords, vcoords,
-                ratiosall[:, i], radius, nsigma, outpath)
-        gs.append(g)
-    return gs
+        params.append([coords, vcoords, ratiosall[:, i], radius, nsigma, outpath])
+
+    pool = Pool(3)
+    return pool.map(run_experiment_from_list, params)
 
 ##########################################################
 def plot_gaussians(gins, n, outdir):
@@ -777,12 +784,12 @@ def main():
 
     ratios, radius = get_knn_ratios(labelsdf, vcoords, nneighbours, args.outdir)
 
-    # gs = gaussian_smooth_all(vcoords, vcoords, ratios, radius, nsigma,
-            # args.outdir, suff='vcoords_') # for vertex coords
+    gs = gaussian_smooth_all(vcoords, vcoords, ratios, radius, nsigma,
+            args.outdir, suff='vcoords_', nprocs=3) # for vertex coords
 
     coords = np.concatenate([xx.reshape(-1, 1), yy.reshape(-1, 1)], axis=1)
     gs = gaussian_smooth_all(coords, vcoords, ratios, radius, nsigma,
-            args.outdir, suff='tiles_')
+            args.outdir, suff='tiles_', nprocs=3)
     plot_gaussians(gs, ntilesx, args.outdir)
 
     # kerbw = .3
@@ -803,4 +810,3 @@ def main():
 ##########################################################
 if __name__ == "__main__":
     main()
-
