@@ -677,10 +677,13 @@ def gaussian_smooth(coords, vcoords, ratios, radius, nsigma, outpath):
 
     g = np.zeros(len(coords), dtype=float)
 
+    def myfun(x, mean, cov, a): return multivariate_normal(x, mean, cov) * a
+
+    from functools import partial
     for i in range(len(vcoords)): # parameterized gaussians functions
         sigma = radius[i] / nsigma
         cov = np.eye(2) * (sigma**2)
-        funcs[i] = lambda x: multivariate_normal(x, vcoords[i, :], cov) * ratios[i]
+        funcs[i] = partial(myfun, mean=vcoords[i, :], cov=cov, a=ratios[i])
 
     for i in range(len(coords)): # filtering by...
         info('i:{}'.format(i))
@@ -774,8 +777,8 @@ def main():
 
     ratios, radius = get_knn_ratios(labelsdf, vcoords, nneighbours, args.outdir)
 
-    gs = gaussian_smooth_all(vcoords, vcoords, ratios, radius, nsigma,
-            args.outdir, suff='vcoords_') # for vertex coords
+    # gs = gaussian_smooth_all(vcoords, vcoords, ratios, radius, nsigma,
+            # args.outdir, suff='vcoords_') # for vertex coords
 
     coords = np.concatenate([xx.reshape(-1, 1), yy.reshape(-1, 1)], axis=1)
     gs = gaussian_smooth_all(coords, vcoords, ratios, radius, nsigma,
