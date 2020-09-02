@@ -709,15 +709,11 @@ def run_experiment_from_list(params):
 def gaussian_smooth_all(coords, vcoords, ratiosall, radius, nsigma,
         outdir, suff='', nprocs=1):
     nratios = ratiosall.shape[1]
-    gs = []
-
-    params = []
     for i in range(ratiosall.shape[1]):
         outpath = pjoin(outdir, 'gaussian_{}{}.pkl'.format(suff, i))
         params.append([coords, vcoords, ratiosall[:, i], radius, nsigma, outpath])
 
-    pool = Pool(3)
-    return pool.map(run_experiment_from_list, params)
+    return Pool(nprocs).map(run_experiment_from_list, params)
 
 ##########################################################
 def plot_gaussians(gins, n, outdir):
@@ -780,7 +776,7 @@ def main():
             nx=ntilesx, ny=ntilesy, relmargin=.1)
 
     nsigma = 3
-    nneighbours = 10
+    nneighbours = 50
 
     ratios, radius = get_knn_ratios(labelsdf, vcoords, nneighbours, args.outdir)
 
