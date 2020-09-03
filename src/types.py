@@ -670,9 +670,9 @@ def gaussian_smooth(coords, vcoords, ratios, radius, nsigma, outpath):
     if os.path.exists(outpath):
         return pickle.load(open(outpath, 'rb'))
 
-    import geopandas as gpd
-    shapefile = gpd.read_file("shapefile.shp")
-    breakpoint()
+    # import geopandas as gpd
+    # shapefile = gpd.read_file("shapefile.shp")
+    # breakpoint()
     
     poly.exterior.distance(point)
     print(shapefile)
@@ -721,10 +721,10 @@ def gaussian_smooth_all(coords, vcoords, ratiosall, radius, nsigma,
         outpath = pjoin(outdir, 'gaussian_{}{}.pkl'.format(suff, i))
         params.append([coords, vcoords, ratiosall[:, i], radius, nsigma, outpath])
 
-    # return Pool(nprocs).map(run_experiment_from_list, params)
-    gs = []
-    for param in params:
-        gs.append(run_experiment_from_list(param))
+    return Pool(nprocs).map(run_experiment_from_list, params)
+    # gs = []
+    # for param in params:
+        # gs.append(run_experiment_from_list(param))
 
 ##########################################################
 def plot_gaussians(gins, n, outdir):
@@ -790,11 +790,9 @@ def main():
 
     ratios, radius = get_knn_ratios(labelsdf, vcoords, nneighbours, args.outdir)
 
-    # print(shapefile)
     gs = gaussian_smooth_all(vcoords, vcoords, ratios, radius, nsigma,
             args.outdir, suff='vcoords_', nprocs=3) # for vertex coords
 
-    return
     coords = np.concatenate([xx.reshape(-1, 1), yy.reshape(-1, 1)], axis=1)
     gs = gaussian_smooth_all(coords, vcoords, ratios, radius, nsigma,
             args.outdir, suff='tiles_', nprocs=3)
