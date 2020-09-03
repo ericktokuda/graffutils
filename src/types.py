@@ -674,8 +674,8 @@ def gaussian_smooth(coords, vcoords, ratios, radius, nsigma, outpath):
     # shapefile = gpd.read_file("shapefile.shp")
     # breakpoint()
     
-    poly.exterior.distance(point)
-    print(shapefile)
+    # poly.exterior.distance(point)
+    # print(shapefile)
 
     epsilon = .00001
     r_neigh = np.max(radius) + epsilon # ball to consider gaussian contributions
