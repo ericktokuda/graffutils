@@ -672,7 +672,7 @@ def gaussian_smooth(coords, vcoords, ratios, radius, nsigma, outpath):
 
     import shapely; from shapely.geometry import Point, Polygon
     import geopandas as gpd
-    poly = gpd.read_file('/home/frodo/results/grafftypes/20200903-sp_hand_shp/handborder.shp')
+    poly = gpd.read_file('MY SHAPEFILE')
 
     epsilon = .00001
     r_neigh = np.max(radius) + epsilon # ball to consider gaussian contributions
@@ -689,7 +689,7 @@ def gaussian_smooth(coords, vcoords, ratios, radius, nsigma, outpath):
 
         if borderd < a:
             factor = .5 * (borderd / a + 1)
-            # with open('/tmp/border.txt', 'a') as fh: print(x, file=fh)
+            with open(outpath + 'border', 'a') as fh: print(x, file=fh)
         else: factor = 1
 
         return ret * factor
