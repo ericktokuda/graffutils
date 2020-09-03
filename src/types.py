@@ -670,12 +670,9 @@ def gaussian_smooth(coords, vcoords, ratios, radius, nsigma, outpath):
     if os.path.exists(outpath):
         return pickle.load(open(outpath, 'rb'))
 
-    # import geopandas as gpd
-    # shapefile = gpd.read_file("shapefile.shp")
-    # breakpoint()
-    
-    # poly.exterior.distance(point)
-    # print(shapefile)
+    import shapely; from shapely.geometry import Point, Polygon
+    import geopandas as gpd
+    poly = gpd.read_file('MY_SHAPEFILE')
 
     epsilon = .00001
     r_neigh = np.max(radius) + epsilon # ball to consider gaussian contributions
@@ -685,7 +682,17 @@ def gaussian_smooth(coords, vcoords, ratios, radius, nsigma, outpath):
 
     g = np.zeros(len(coords), dtype=float)
 
-    def myfun(x, mean, cov, a): return multivariate_normal(x, mean, cov) * a
+    def myfun(x, mean, cov, a):
+        ret =  multivariate_normal(x, mean, cov) * a
+
+        borderd = poly.exterior.distance(Point(x)).values[0]
+
+        if borderd < a:
+            factor = .5 * (borderd / a + 1)
+            # with open('/tmp/border.txt', 'a') as fh: print(x, file=fh)
+        else: factor = 1
+
+        return ret * factor
 
     from functools import partial
     for i in range(len(vcoords)): # parameterized gaussians functions
@@ -781,7 +788,7 @@ def main():
 
     # Kernel density estimation
     info('Elapsed time:{}'.format(time.time()-t0))
-    ntilesx = ntilesy = 500
+    ntilesx = ntilesy = 100
     xx, yy, dx, dy = create_meshgrid(labelsdf.x, labelsdf.y,
             nx=ntilesx, ny=ntilesy, relmargin=.1)
 
