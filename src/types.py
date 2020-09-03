@@ -672,7 +672,7 @@ def gaussian_smooth(coords, vcoords, ratios, radius, nsigma, outpath):
 
     import shapely; from shapely.geometry import Point, Polygon
     import geopandas as gpd
-    poly = gpd.read_file('MY_SHAPEFILE')
+    poly = gpd.read_file('/home/frodo/results/grafftypes/20200903-sp_hand_shp/handborder.shp')
 
     epsilon = .00001
     r_neigh = np.max(radius) + epsilon # ball to consider gaussian contributions
@@ -739,7 +739,7 @@ def plot_gaussians(gins, n, outdir):
         fig, ax = plt.subplots(figsize=(10, 10))
         outpath = pjoin(outdir, 'gaussian_{}.png'.format(i))
         g = gin.reshape(n, n)
-        im = ax.imshow(g.T)
+        im = ax.imshow(g.T, origin='lower')
         fig.colorbar(im)
         plt.savefig(outpath)
 
