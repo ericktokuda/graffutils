@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from myutils import info, create_readme
 import pandas as pd
 import requests
+import json
 
 KEY = os.environ['GOOGLEKEY']
 TEMPLATE = 'https://maps.googleapis.com/maps/api/streetviewOPTION?size=640x640&location=LAT,LON&fov=90&heading=ANG&pitch=20&key=' + KEY
@@ -30,7 +31,7 @@ def download_images(lon, lat, outdir, ntries=3):
     nimgs = 0
     for ang in angles:
         url = urlorig.replace('ANG', str(ang))
-        outpath = pjoin(outdir, '_{:.08f}_{:.08f}_{}.jpg'.format(lon, lat, ang))
+        outpath = pjoin(outdir, '_{:.08f}_{:.08f}_{}.jpg'.format(lat, lon, ang))
         if os.path.exists(outpath): continue
         for it in range(ntries):
             info('url:{}'.format(url))
@@ -47,14 +48,24 @@ def download_images(lon, lat, outdir, ntries=3):
     return nimgs
 
 ##########################################################
-def download_metadata(lon, lat, outdir, ntries=3):
+def get_metadata(lon, lat, outdir, ntries=3):
     """Download metadata and return contents"""
     info(inspect.stack()[0][3] + '()')
+    outpath = pjoin(outdir, '_{:.08f}_{:.08f}.json'.format(lat, lon))
+
+    try:
+        z = json.load(open(outpath))
+        if 'location' in z:
+            return z['status'], z['location']['lng'], z['location']['lat']
+        else:
+            return z['status'], lon, lat
+    except Exception as e:
+        pass
+
     url = TEMPLATE.replace('OPTION', '/metadata')
     url = url.replace('LON', str(lon)).replace('LAT', str(lat)).replace('ANG', '0')
     info('url:{}'.format(url))
 
-    outpath = pjoin(outdir, '_{:.08f}_{:.08f}.json'.format(lon, lat))
     metadata = []
 
     lonsnap = lon; latsnap = lat;
@@ -65,10 +76,11 @@ def download_metadata(lon, lat, outdir, ntries=3):
             time.sleep(np.random.rand()*5)
             continue
 
+        with open(outpath, 'wb') as f:
+            f.write(r.content)
+
         code = r.json()['status']
         if code == 'OK':
-            with open(outpath, 'wb') as f:
-                f.write(r.content)
             lonsnap = r.json()['location']['lng']
             latsnap = r.json()['location']['lat']
         break
@@ -88,11 +100,13 @@ def download_all(df, quota, outdir):
     downloads = []
 
     acc = 0
-    for idx, row in df.iterrows():
+    # for idx, row in df.iterrows():
     # for idx, row in df[::-1].iterrows():
+    for idx, row in df[::-1].iterrows():
+        if idx % 3 != 0: continue
         info('idx:{}'.format(idx))
 
-        statusmeta, lonsnap, latsnap = download_metadata(row.lon,
+        statusmeta, lonsnap, latsnap = get_metadata(row.lon,
                 row.lat, metadatadir)
 
         if statusmeta == 'OK':
@@ -112,7 +126,10 @@ def print_warning(quota):
     print('https://developers.google.com/maps/documentation/streetview/usage-and-billing\n')
     print('and the available quota in the free tier:')
     print('https://console.cloud.google.com/billing/\n')
-    print('If you are sure about this value, press any key.')
+    print('Also, the key provided is', KEY)
+    print('If you are sure about these info\n')
+    print('press any key to continue')
+
 ##########################################################
 def main():
     info(inspect.stack()[0][3] + '()')
