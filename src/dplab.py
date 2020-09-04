@@ -187,7 +187,7 @@ def predict_all(modelpath, dirpaths, outdir):
 
     labels = np.array(['background', 'tag', 'frame', 'sign'])
 
-    MODEL = DeepLabModel(modelpath)
+    model = DeepLabModel(modelpath)
     info('Model loaded successfully!')
 
     for dir_ in dirpaths:
