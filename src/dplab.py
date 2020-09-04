@@ -209,7 +209,7 @@ def predict_all(modelpath, dirpaths, outdir):
             info('file:{}'.format(f))
             if not f.endswith('.jpg'): continue
             suff = os.path.splitext(f)[0]
-            imgpath = os.path.join(imgdir, f)
+            imgpath = os.path.join(imdir, f)
 
             try: img = imageio.imread(imgpath)
             except: continue
