@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """ DeepLab evaluation
+Tensorflow 1.x is required (tested on tensorflow==1.15).
 """
 
 import sys
@@ -10,6 +11,8 @@ from shapely.geometry import Polygon, MultiPolygon
 from pathlib import Path
 import os
 import random
+import inspect
+import imageio
 
 import argparse
 import logging
@@ -20,7 +23,8 @@ import tarfile
 import tempfile
 from six.moves import urllib
 
-from matplotlib import gridspec
+import matplotlib
+from matplotlib import gridspec, cm
 from matplotlib import pyplot as plt
 import numpy as np
 from PIL import Image
@@ -28,7 +32,7 @@ from PIL import Image
 import tensorflow as tf
 import time
 
-from src.utils import info
+from myutils import info
 
 #########################################################
 class DeepLabModel(object):
@@ -42,17 +46,13 @@ class DeepLabModel(object):
     self.graph = tf.Graph()
     graph_def = tf.GraphDef.FromString(open(frozenpath, 'rb').read())
 
-    if graph_def is None:
-      raise RuntimeError('Cannot find inference graph in tar archive.')
-
     with self.graph.as_default():
         tf.import_graph_def(graph_def, name='')
 
     self.sess = tf.Session(graph=self.graph)
 
   def predict(self, image):
-    """Prediction on @image and return the np.array mask
-    """
+    """Prediction on @image and return the np.array mask """
     batch_seg_map = self.sess.run(
         self.OUTPUT_TENSOR_NAME,
         feed_dict={self.INPUT_TENSOR_NAME: [image]})
@@ -60,11 +60,8 @@ class DeepLabModel(object):
 
 ##########################################################
 def create_pascal_label_colormap():
-  """Creates a label colormap used in PASCAL VOC segmentation benchmark.
+  """Creates a label colormap used in PASCAL VOC segmentation benchmark.  """
 
-  Returns:
-    A Colormap for visualizing segmentation results.
-  """
   colormap = np.zeros((256, 3), dtype=int)
   ind = np.arange(256, dtype=int)
 
@@ -74,7 +71,6 @@ def create_pascal_label_colormap():
     ind >>= 3
 
   return colormap
-
 
 ##########################################################
 def label_to_color_image(label):
@@ -92,6 +88,7 @@ def label_to_color_image(label):
     ValueError: If label is not of rank 2 or its value is larger than color
       map maximum entry.
   """
+
   if label.ndim != 2:
     raise ValueError('Expect 2-D input label')
 
@@ -101,49 +98,6 @@ def label_to_color_image(label):
     raise ValueError('label value too large.')
 
   return colormap[label]
-
-
-##########################################################
-def vis_segmentation(image, seg_map):
-  """Visualizes input image, segmentation map and overlay view."""
-  plt.figure(figsize=(15, 5))
-  grid_spec = gridspec.GridSpec(1, 4, width_ratios=[6, 6, 6, 1])
-
-  plt.subplot(grid_spec[0])
-  plt.imshow(image)
-  plt.axis('off')
-  plt.title('input image')
-
-  plt.subplot(grid_spec[1])
-  seg_image = label_to_color_image(seg_map).astype(np.uint8)
-  plt.imshow(seg_image)
-  plt.axis('off')
-  plt.title('segmentation map')
-
-  plt.subplot(grid_spec[2])
-  plt.imshow(image)
-  plt.imshow(seg_image, alpha=0.7)
-  plt.axis('off')
-  plt.title('segmentation overlay')
-
-  unique_labels = np.unique(seg_map)
-  ax = plt.subplot(grid_spec[3])
-  plt.imshow(
-      FULL_COLOR_MAP[unique_labels].astype(np.uint8), interpolation='nearest')
-  ax.yaxis.tick_right()
-  plt.yticks(range(len(unique_labels)), labels[unique_labels])
-  plt.xticks([], [])
-  ax.tick_params(width=0.0)
-  plt.grid('off')
-  plt.show()
-
-
-
-# def get_2dpoints_from_cv2_struct(cv2points):
-    # points = []
-    # for cv2point in cv2points:
-        # points.append(cv2point[0])
-    # return points
 
 ##########################################################
 def get_contours(mask_):
@@ -165,7 +119,6 @@ def dump_contours_to_wkt(polys, wktpath):
         Path(wktpath).touch()
         return
 
-    # print('wktpath:{}'.format(wktpath))
     shapelyinput = []
 
     for poly in polys:
@@ -196,76 +149,94 @@ def crop_masks(im, imfilename, polys, cropdir):
         cropped.save(croppath)
 
 ##########################################################
-def run_visualization(impath):
-  """Inferences DeepLab model and visualizes result."""
+def run_visualization(im, immask, labels, outpath):
+    """Inferences DeepLab model and visualizes result."""
 
-  original_im = Image.open(impath)
-  resized_im, seg_map = MODEL.run(original_im)
+    figsize = (12, 6)
+    fig, axs = plt.subplots(1, 2, figsize=figsize)
 
-  vis_segmentation(resized_im, seg_map)
+    axs[0].imshow(im)
+    imgmean = np.mean(im, axis=2)
+    axs[1].imshow(imgmean, alpha=.8, cmap='gray')
+
+    clrs = ['#ffffff','#377eb8','#4daf4a','#984ea3','#ff7f00']
+    mycmap = matplotlib.colors.LinearSegmentedColormap.from_list('mycmap',
+            clrs, len(labels))
+    implot = axs[1].imshow(immask, cmap=mycmap, alpha=.7, vmin=0, vmax=len(labels)-1)
+    cbar = fig.colorbar(implot, ticks=range(len(labels)), shrink=.75)
+    cbar.ax.set_ylim([0, len(labels)])
+    cbar.ax.set_yticklabels(labels)
+
+    axs[0].set_xticks([]); axs[0].set_yticks([]);
+    axs[1].set_xticks([]); axs[1].set_yticks([]);
+    plt.tight_layout()
+    plt.savefig(vispath)
+
 ##########################################################
-def predict_all(modelpath, imdir, outdir):
+def predict_all(modelpath, dirpaths, outdir):
     """Predict using frozen @modelpath all images in @imdir and outputs
     to @outdir
     """
     info(inspect.stack()[0][3] + '()')
 
-    labels = np.asarray('background tag frame sign'.split(' '))
+    wktdir = pjoin(outdir, 'wkt')
+    if not os.path.exists(wktdir): os.mkdir(wktdir)
 
-    FULL_LABEL_MAP = np.arange(len(labels)).reshape(len(labels), 1)
-    FULL_COLOR_MAP = label_to_color_image(FULL_LABEL_MAP)
+    mskdir = pjoin(outdir, 'masksum')
+    if not os.path.exists(mskdir): os.mkdir(mskdir)
 
-    MODEL = DeepLabModel(args.frozenpath)
+    labels = np.array(['background', 'tag', 'frame', 'sign'])
+
+    MODEL = DeepLabModel(modelpath)
     info('Model loaded successfully!')
-
-    os.makedirs(args.outdir, exist_ok=True)
-    os.makedirs(pjoin(args.outdir, 'wkt'), exist_ok=True)
-    os.makedirs(pjoin(args.outdir, 'masksum'), exist_ok=True)
-
-    dirpaths = open(args.dirslist).read().splitlines()
-    print('dirpaths:{}'.format(dirpaths))
 
     for dir_ in dirpaths:
         imdir = pjoin(dir_, 'img/')
         info('{}'.format(dir_))
 
         lastpath = os.path.basename(os.path.normpath(dir_))
-        wktdir = pjoin(args.outdir, 'wkt', lastpath)
+        wktdir = pjoin(outdir, 'wkt', lastpath)
         os.makedirs(wktdir, exist_ok=True)
 
-        masksumdir = pjoin(args.outdir, 'masksum', lastpath)
+        masksumdir = pjoin(outdir, 'masksum', lastpath)
         os.makedirs(masksumdir, exist_ok=True)
 
-        cropdir = pjoin(args.outdir, 'crop', lastpath)
+        cropdir = pjoin(outdir, 'crop', lastpath)
         os.makedirs(cropdir, exist_ok=True)
 
-        imgs = sorted(os.listdir(imdir))
-        for im in imgs:
-            if not im.endswith('.jpg'): continue
+        files = sorted(os.listdir(imdir))
+        for f in files:
+            info('file:{}'.format(f))
+            if not f.endswith('.jpg'): continue
+            suff = os.path.splitext(f)[0]
+            imgpath = os.path.join(imgdir, f)
+
+            try: img = imageio.imread(imgpath)
+            except: continue
+
+            mask = model.predict(img)
+
+            # vis
+            vispath = pjoin(outdir, os.path.basename(imgpath))
+            run_visualization(img, mask, labels, vispath)
+            continue
+
             # info('{}'.format(im))
-            wktpath = pjoin(wktdir, os.path.splitext(im)[0]+'.wkt')
-            masksumpath = pjoin(masksumdir, os.path.splitext(im)[0]+'.txt')
+            wktpath = pjoin(wktdir, suff +'.wkt')
+            masksumpath = pjoin(masksumdir, suff +'.txt')
 
             if os.path.exists(wktpath): continue
 
-            t0 = time.time()
-            impath = os.path.join(imdir, im)
-            try:
-                original_im = Image.open(impath).convert('RGB')
-            except:
-                continue
+            mask[mask !=1] = 0 # Just tag!
 
-            segmap = MODEL.run(np.array(original_im))
-            segmap[segmap !=1] = 0 # Just tag!
-
-            masksum = np.sum(segmap[:])
+            masksum = np.sum(mask[:]) # dump masksum
             with open(masksumpath, 'w') as fh:
                 fh.write(str(masksum))
 
             polys = get_contours(segmap)
-            dump_contours_to_wkt(polys, wktpath)
+            dump_contours_to_wkt(polys, wktpath) # dump contours
 
-            crop_masks(original_im, im, polys, cropdir)
+            crop_masks(img, f, polys, cropdir)
 
 ##########################################################
 def analyze_deeplab_log(logpath):
@@ -308,8 +279,9 @@ def main():
     parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
     args = parser.parse_args()
 
-    if not os.path.exists(outdir): os.mkdir(outdir)
-    predict_all(args.frozenpath, imdir, args.outdir)
+    if not os.path.exists(args.outdir): os.mkdir(args.outdir)
+    # predict_all(args.frozenpath, args.imdir, args.outdir)
+    predict_all(args.frozenpath, [args.imdir], args.outdir)
 
 ##########################################################
 if __name__ == "__main__":
