@@ -170,7 +170,7 @@ def run_visualization(im, immask, labels, outpath):
     axs[0].set_xticks([]); axs[0].set_yticks([]);
     axs[1].set_xticks([]); axs[1].set_yticks([]);
     plt.tight_layout()
-    plt.savefig(vispath)
+    plt.savefig(outpath)
 
 ##########################################################
 def predict_all(modelpath, dirpaths, outdir):
