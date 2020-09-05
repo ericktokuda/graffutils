@@ -38,6 +38,7 @@ palettehex3 = ['#e41a1c','#377eb8','#e6e600','#984ea3','#ff7f00','#4daf4a','#a65
 palette3 = hex2rgb(palettehex3, normalized=True, alpha=.7)
 palette3[5,3] = 1.0
 
+R = 6371000
 ##########################################################
 def plot_types(infomapout, shppath, clulabelspath, outdir):
     np.random.seed(0)
@@ -493,7 +494,7 @@ def calculate_correlations(dfclulabels, accessibpath, outdir, kdeparam='scott'):
 
 ##########################################################
 def correlate_count_and_accessib(dfclulabels, accessibpath, vcoords,
-        outdir, kdebw='scott'):
+        outdir, kdebw='scott', filterinds=[]):
     """Plot count of graffiti vs accessibility for each vertex"""
     info(inspect.stack()[0][3] + '()')
 
@@ -505,6 +506,10 @@ def correlate_count_and_accessib(dfclulabels, accessibpath, vcoords,
     info('KERNEL dim:{}, n:{}, neff:{}, factor:{}, cov:{}'.\
             format(ker.d, ker.n, ker.neff, ker.factor, ker.covariance))
     
+    if len(filterinds) > 0:
+        vcoords = vcoords[filterinds]
+        accs = accs[filterinds]
+        
     probs = ker(vcoords.T)
 
     # m = np.max(accs) / 3
@@ -533,7 +538,7 @@ def correlate_count_and_accessib(dfclulabels, accessibpath, vcoords,
     return corr
 
 ##########################################################
-def plot_densities(df, xx, yy, mapx, mapy, outdir, kerbw='scott'):
+def plot_densities(df, xx, yy, mapx, mapy, outdir, kerbw='scott', filterinds=[]):
     """Plot the densities in the grid @xx, @yy """
     info(inspect.stack()[0][3] + '()')
 
@@ -543,15 +548,21 @@ def plot_densities(df, xx, yy, mapx, mapy, outdir, kerbw='scott'):
     figscale = 4
     fig, axs = plt.subplots(ncols, figsize=(figscale, ncols*figscale))
 
+    # if len(filterinds) > 0:
+        # xx = xx[filterinds]
+        # yy = yy[filterinds]
+
     pdfvals = np.ndarray((len(labels), xx.shape[0], xx.shape[1]))
     for j, l in enumerate(labels): # compute the pdf
         filtered = df[(df.label == int(l))]
         pdfvals[j, :, :], _ = compute_pdf_over_grid(filtered.x,
                 filtered.y, xx, yy, kerbw)
 
+    im = axs[ 0].scatter(xx, yy, c='gray') # background
     meanpdf = np.mean(pdfvals, axis=0) # mean pdf
     axs[0].plot(mapx, mapy, c='dimgray') # plot border
-    im = axs[ 0].scatter(xx, yy, c=meanpdf) # meand pdf plot
+    # im = axs[ 0].scatter(xx, yy, c=meanpdf) # meand pdf plot
+    im = axs[ 0].scatter(xx[filterinds], yy[filterinds], c=meanpdf[filterinds]) # meand pdf plot
     cbar = axs[0].figure.colorbar(im, ax=axs[0], fraction=0.04, pad=0.00)
     axs[0].axis("off")
 
@@ -572,8 +583,10 @@ def plot_densities(df, xx, yy, mapx, mapy, outdir, kerbw='scott'):
         vals = pdfvals[j] - meanpdf
         kld[j] = kl_divergence(pdfvals[j] / np.sum(pdfvals[j]),
                 meanpdf / np.sum(meanpdf)) # normalized kld
+
+        axs[jj].scatter(xx, yy, c='gray') # background
         axs[jj].plot(mapx, mapy, c='darkgray') # plot border
-        im = axs[jj].scatter(xx, yy, c=vals, cmap=cmap,
+        im = axs[jj].scatter(xx[filterinds], yy[filterinds], c=vals[filterinds], cmap=cmap,
                 vmin=minval, vmax=maxval)
         cbar = axs[jj].figure.colorbar(im, ax=axs[jj], fraction=0.04, pad=0.00)
         axs[jj].axis("off")
@@ -750,6 +763,22 @@ def plot_gaussians(gins, n, outdir):
         plt.savefig(outpath)
 
 ##########################################################
+def get_vertices_above_density(query, refcoords, r):
+    """Get indices of graph vertices which have at least one graff
+    occurrence nearby"""
+    info(inspect.stack()[0][3] + '()')
+
+    from sklearn.neighbors import BallTree
+    bt = BallTree(np.deg2rad(refcoords), metric='haversine')
+
+    counts = bt.query_radius(
+            np.deg2rad(np.c_[query[:, 0], query[:, 1]]), r=r/R,
+            count_only=True)
+    _, x = np.unique(counts, return_counts=True)
+    
+    return np.where(counts > 0)
+
+##########################################################
 def main():
     info(inspect.stack()[0][3] + '()')
     t0 = time.time()
@@ -769,13 +798,26 @@ def main():
     vcoordspath = 'data/vcoords.csv'
     c0 = [-46.6333, -23.5505] # Sao paulo
 
-    shppath = './data/shp/'
-    accpath = './data/accessib/acc15.txt'
+    shppath = './data/20200224-shp/'
+    accpath = './data/20200630-accessib/acc15.txt'
 
     labelsdf = compile_labels(annotdir, labelsclu) # Do this for each annotator
     labelsdf, vcoords = parse_infomap_results(graphmlpath, clupath, labelsdf,
             'er', labelsclu, vcoordspath)
+    ngraff = len(labelsdf)
     
+    grcoords = [[labelsdf.iloc[i].x, labelsdf.iloc[i].y] for i in range(ngraff)]
+    grcoords = np.array(grcoords)
+
+    # plot_occurrences_density(vcoords, labelsdf, args.outdir)
+    minr = 500
+    indsdens = get_vertices_above_density(vcoords, grcoords, minr)
+    
+    # for kerbw in np.arange(.05, .41, .05):
+        # info('kerbw:{}'.format(kerbw))
+        # corr = correlate_count_and_accessib(labelsdf, accpath, vcoords, args.outdir, kerbw, indsdens)
+        # info('corr:{}'.format(corr))
+    # return
 
     # plot_types(clupath, shppath, labelsclu, args.outdir)
     # clus = sorted(np.unique(labelsdf.cluster))
@@ -792,31 +834,38 @@ def main():
     xx, yy, dx, dy = create_meshgrid(labelsdf.x, labelsdf.y,
             nx=ntilesx, ny=ntilesy, relmargin=.1)
 
-    nsigma = 3
-    nneighbours = 50
+    # nsigma = 3
+    # nneighbours = 50
+    # ratios, radius = get_knn_ratios(labelsdf, vcoords, nneighbours, args.outdir)
+    # gs = gaussian_smooth_all(vcoords, vcoords, ratios, radius, nsigma,
+            # args.outdir, suff='vcoords_', nprocs=3) # for vertex coords
 
-    ratios, radius = get_knn_ratios(labelsdf, vcoords, nneighbours, args.outdir)
+    # coords = np.concatenate([xx.reshape(-1, 1), yy.reshape(-1, 1)], axis=1)
+    # gs = gaussian_smooth_all(coords, vcoords, ratios, radius, nsigma,
+            # args.outdir, suff='tiles_', nprocs=3)
+    # plot_gaussians(gs, ntilesx, args.outdir)
 
-    gs = gaussian_smooth_all(vcoords, vcoords, ratios, radius, nsigma,
-            args.outdir, suff='vcoords_', nprocs=3) # for vertex coords
+    kerbw = .3
 
-    coords = np.concatenate([xx.reshape(-1, 1), yy.reshape(-1, 1)], axis=1)
-    gs = gaussian_smooth_all(coords, vcoords, ratios, radius, nsigma,
-            args.outdir, suff='tiles_', nprocs=3)
-    plot_gaussians(gs, ntilesx, args.outdir)
+    pdf, _ = compute_pdf_over_grid(labelsdf.x, labelsdf.y, xx, yy, kerbw)
+    flattened = np.array([[x_, y_] for x_, y_ in zip(xx.flatten(), yy.flatten())])
+    indsdensflat = get_vertices_above_density(flattened, grcoords, minr)
+    ii = (indsdensflat[0]/ntilesy).astype(int)
+    jj = (indsdensflat[0]%ntilesy).astype(int)
+    # indsdens = (ii, jj)
 
-    # kerbw = .3
-    # pdf, _ = compute_pdf_over_grid(labelsdf.x, labelsdf.y, xx, yy, kerbw)
     # plot_contours(pdf, labelsdf.x, labelsdf.y, xx, yy, args.outdir)
     # plot_surface(pdf, labelsdf.x, labelsdf.y, xx, yy, args.outdir)
     # plot_wireframe(pdf, labelsdf.x, labelsdf.y, xx, yy, args.outdir)
     # plot_hist2d(labelsdf.x, labelsdf.y, args.outdir)
     # mapx, mapy = geo.get_shp_points(shppath)
-    # plot_densities(labelsdf, xx, yy, mapx, mapy, args.outdir, kerbw)
+    # plot_densities(labelsdf, xx, yy, mapx, mapy, args.outdir, kerbw, indsdens)
+
     # for kerbw in np.arange(.05, .41, .05):
-        # info('kerbw:{}'.format(kerbw))
-        # corr = correlate_count_and_accessib(labelsdf, accpath, vcoords, args.outdir, kerbw)
-        # info('corr:{}'.format(corr))
+    for kerbw in [.3]:
+        info('kerbw:{}'.format(kerbw))
+        corr = correlate_count_and_accessib(labelsdf, accpath, vcoords, args.outdir, kerbw, indsdens)
+        info('corr:{}'.format(corr))
 
     # calculate_correlation(df, accessibpath, args.outdir, .3)
 
