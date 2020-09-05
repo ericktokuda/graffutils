@@ -83,6 +83,7 @@ def get_metadata(lon, lat, outdir, ntries=3):
         if code == 'OK':
             lonsnap = r.json()['location']['lng']
             latsnap = r.json()['location']['lat']
+            if not ('Google' in r.json()['copyright']): code = 'NONGOOGLE'
         break
 
     return code, lonsnap, latsnap
