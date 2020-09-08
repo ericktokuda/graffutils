@@ -20,6 +20,7 @@ from scipy.spatial import cKDTree
 import scipy.stats as stats
 import igraph
 import geopandas as geopd
+from geopandas import GeoSeries
 import matplotlib_venn
 from src.utils import info, export_individual_axis, hex2rgb
 # plt.style.use('seaborn')
@@ -29,6 +30,8 @@ import scipy.spatial
 from numba import jit
 import pickle
 from multiprocessing import Pool
+from functools import partial
+import shapely; from shapely.geometry import Point;
 
 palettehex = ['#8dd3c7','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69']
 palette = hex2rgb(palettehex, normalized=True, alpha=1.0)
@@ -676,54 +679,48 @@ def find_tile_idx(pt, xx, yy, dx, dy):
     return int(delta[0] // dx), int(delta[1] // dy)
 
 ##########################################################
-def gaussian_smooth(coords, vcoords, ratios, radius, nsigma, outpath):
+def gaussian_smooth(coords, refcoords, ratios, radius, nsigma, outpath):
     """Gaussian smooth for every type"""
     info(inspect.stack()[0][3] + '()')
 
+    diffr = .001 # diffusion radius for density estimation
     if os.path.exists(outpath):
         return pickle.load(open(outpath, 'rb'))
 
-    import shapely; from shapely.geometry import Point, Polygon
-    import geopandas as gpd
-    poly = gpd.read_file('MY SHAPEFILE')
-
-    epsilon = .00001
-    r_neigh = np.max(radius) + epsilon # ball to consider gaussian contributions
-
-    tree = cKDTree(vcoords)
-    funcs = np.ndarray(len(vcoords), dtype=object)
+    tree = cKDTree(refcoords)
+    funcs = np.ndarray(len(refcoords), dtype=object)
 
     g = np.zeros(len(coords), dtype=float)
 
-    def myfun(x, mean, cov, a):
-        ret =  multivariate_normal(x, mean, cov) * a
-
-        borderd = poly.exterior.distance(Point(x)).values[0]
-
-        if borderd < a:
-            factor = .5 * (borderd / a + 1)
-            with open(outpath + 'border', 'a') as fh: print(x, file=fh)
-        else: factor = 1
-
-        return ret * factor
-
-    from functools import partial
-    for i in range(len(vcoords)): # parameterized gaussians functions
-        sigma = radius[i] / nsigma
+    def myfun(x, mean, radius, nsigma, ratio, r):
+        R = radius
+        sigma = radius / nsigma
         cov = np.eye(2) * (sigma**2)
-        funcs[i] = partial(myfun, mean=vcoords[i, :], cov=cov, a=ratios[i])
+        peak =  multivariate_normal(x, mean, cov)
+
+        # return (peak * ratio) # TODO: remove it
+
+        if R <= r: return (peak * ratio) # very dense region
+
+        inds = np.array(tree.query_ball_point([x], R)[0])
+
+        if len(inds) == 0: return 0 # very sparse region
+
+        pts = GeoSeries([ Point(p[0], p[1]) for p in refcoords[inds] ])
+        circles = pts.buffer(r)
+        occupied = circles.unary_union.area
+        total = np.pi * R**2
+        factor = min(occupied / total, 1)
+        return (peak * ratio) * factor
+
+    for i in range(len(refcoords)): # parameterized gaussians functions
+        funcs[i] = partial(myfun, mean=refcoords[i, :], radius=radius[i],
+                nsigma=nsigma, ratio=ratios[i], r=diffr)
 
     for i in range(len(coords)): # filtering by...
         info('i:{}'.format(i))
         c0 = np.array([coords[i, :]]) # ...distance
-        inds = np.array(tree.query_ball_point([c0], r_neigh)[0][0])
-        if len(inds) == 0: continue
-        dist = scipy.spatial.distance.cdist(vcoords[inds, :], c0)
-        _inds = np.where(dist[:, -1] < radius[inds])[0] # ...radius
-        neighids = inds[_inds]
-
-        for neighid in neighids:
-            g[i] += funcs[neighid](c0[0])
+        g[i] = funcs[i](c0[0])
 
     pickle.dump(g, open(outpath, 'wb'))
     return g
@@ -742,6 +739,7 @@ def gaussian_smooth_all(coords, vcoords, ratiosall, radius, nsigma,
         params.append([coords, vcoords, ratiosall[:, i], radius, nsigma, outpath])
 
     return Pool(nprocs).map(run_experiment_from_list, params)
+
     # gs = []
     # for param in params:
         # gs.append(run_experiment_from_list(param))
@@ -783,6 +781,7 @@ def main():
     info(inspect.stack()[0][3] + '()')
     t0 = time.time()
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--nneighbours', default=3, type=int, help='Num neighbours')
     parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
     args = parser.parse_args()
 
@@ -811,7 +810,7 @@ def main():
 
     # plot_occurrences_density(vcoords, labelsdf, args.outdir)
     minr = 500
-    indsdens = get_vertices_above_density(vcoords, grcoords, minr)
+    indsdens = [] #indsdens = get_vertices_above_density(vcoords, grcoords, minr)
     
     # for kerbw in np.arange(.05, .41, .05):
         # info('kerbw:{}'.format(kerbw))
@@ -834,11 +833,11 @@ def main():
     xx, yy, dx, dy = create_meshgrid(labelsdf.x, labelsdf.y,
             nx=ntilesx, ny=ntilesy, relmargin=.1)
 
-    # nsigma = 3
-    # nneighbours = 50
-    # ratios, radius = get_knn_ratios(labelsdf, vcoords, nneighbours, args.outdir)
-    # gs = gaussian_smooth_all(vcoords, vcoords, ratios, radius, nsigma,
-            # args.outdir, suff='vcoords_', nprocs=3) # for vertex coords
+    nsigma = 3
+    ratios, radius = get_knn_ratios(labelsdf, vcoords, args.nneighbours, args.outdir)
+    gs = gaussian_smooth_all(vcoords, vcoords, ratios, radius, nsigma,
+            args.outdir, suff='vcoords_', nprocs=3) # for vertex coords
+    return
 
     # coords = np.concatenate([xx.reshape(-1, 1), yy.reshape(-1, 1)], axis=1)
     # gs = gaussian_smooth_all(coords, vcoords, ratios, radius, nsigma,
