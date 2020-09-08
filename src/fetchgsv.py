@@ -50,17 +50,21 @@ def download_images(lon, lat, outdir, ntries=3):
 ##########################################################
 def get_metadata(lon, lat, outdir, ntries=3):
     """Download metadata and return contents"""
-    info(inspect.stack()[0][3] + '()')
+    # info(inspect.stack()[0][3] + '()')
     outpath = pjoin(outdir, '_{:.08f}_{:.08f}.json'.format(lat, lon))
 
     try:
+        existing = True
         z = json.load(open(outpath))
         if 'location' in z:
-            return z['status'], z['location']['lng'], z['location']['lat']
+            return z['status'], z['location']['lng'], z['location']['lat'], existing
         else:
-            return z['status'], lon, lat
+            return z['status'], lon, lat, existing
     except Exception as e:
         pass
+
+
+    existing = False
 
     url = TEMPLATE.replace('OPTION', '/metadata')
     url = url.replace('LON', str(lon)).replace('LAT', str(lat)).replace('ANG', '0')
@@ -86,7 +90,23 @@ def get_metadata(lon, lat, outdir, ntries=3):
             if not ('Google' in r.json()['copyright']): code = 'NONGOOGLE'
         break
 
-    return code, lonsnap, latsnap
+    return code, lonsnap, latsnap, existing
+
+##########################################################
+def download_missing_metadata(imdir, cachedir):
+    """Download metadata and image, if available """
+    info(inspect.stack()[0][3] + '()')
+
+    downloads = []
+
+    files = sorted(os.listdir(imdir))
+    nongoogle = 0
+    for i, f in enumerate(files):
+        info('i:{}'.format(i))
+        _, latstr, lonstr, _ = f.strip().split('.jpg')[0].split('_')
+        statusmeta, _, _, _ = get_metadata(float(lonstr), float(latstr), cachedir)
+        if statusmeta != 'OK': nongoogle += 1
+    info('nongoogle:{}'.format(nongoogle))
 
 ##########################################################
 def download_all(df, quota, outdir):
@@ -101,13 +121,10 @@ def download_all(df, quota, outdir):
     downloads = []
 
     acc = 0
-    # for idx, row in df.iterrows():
-    # for idx, row in df[::-1].iterrows():
-    for idx, row in df[::-1].iterrows():
-        if idx % 3 != 0: continue
+    for idx, row in df.iterrows():
         info('idx:{}'.format(idx))
 
-        statusmeta, lonsnap, latsnap = get_metadata(row.lon,
+        statusmeta, lonsnap, latsnap, _ = get_metadata(row.lon,
                 row.lat, metadatadir)
 
         if statusmeta == 'OK':
@@ -143,6 +160,9 @@ def main():
 
     if not os.path.isdir(args.outdir): os.mkdir(args.outdir)
     readmepath = create_readme(sys.argv, args.outdir)
+
+    download_missing_metadata('madrid/img/', 'madrid/newmetadata/')
+    return
 
     print_warning(args.quota); input()
 
