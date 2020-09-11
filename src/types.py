@@ -693,6 +693,7 @@ def gaussian_smooth(coords, refcoords, ratios, radius, nsigma, outpath):
     g = np.zeros(len(coords), dtype=float)
 
     def myfun(x, mean, radius, nsigma, ratio, r):
+        if ratio == 0: return 0
         R = radius
         sigma = radius / nsigma
         cov = np.eye(2) * (sigma**2)
