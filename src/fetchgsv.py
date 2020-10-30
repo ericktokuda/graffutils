@@ -133,6 +133,7 @@ def download_all(df, quota, outdir):
         if statusmeta == 'OK':
             numimg = download_images(lonsnap, latsnap, imgdir)
             acc += numimg
+        else: numimg = 0
 
         downloads.append([row.lon, row.lat, lonsnap, latsnap, statusmeta, numimg])
         if acc > int(quota): break
