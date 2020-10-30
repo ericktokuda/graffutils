@@ -35,7 +35,7 @@ def download_images(lon, lat, outdir, ntries=3):
         if os.path.exists(outpath): continue
         for it in range(ntries):
             info('url:{}'.format(url))
-            
+
             r = requests.get(url)
             if r.status_code != 200: # conectivity issue
                 code = str(r.status_code)
@@ -121,8 +121,11 @@ def download_all(df, quota, outdir):
     downloads = []
 
     acc = 0
-    for idx, row in df.iterrows():
+    ids = sorted(range(len(df)))
+
+    for idx in ids:
         info('idx:{}'.format(idx))
+        row = df.loc[idx]
 
         statusmeta, lonsnap, latsnap, _ = get_metadata(row.lon,
                 row.lat, metadatadir)
@@ -161,9 +164,7 @@ def main():
     if not os.path.isdir(args.outdir): os.mkdir(args.outdir)
     readmepath = create_readme(sys.argv, args.outdir)
 
-    download_missing_metadata('madrid/img/', 'madrid/newmetadata/')
-    return
-
+    # download_missing_metadata('madrid/img/', 'madrid/newmetadata/')
     print_warning(args.quota); input()
 
     df = pd.read_csv(args.coords)

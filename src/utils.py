@@ -35,7 +35,6 @@ def dump_to_hdf5(x, h5path, type=float):
     dset = fh.create_dataset("data", data=x, dtype=type)
     fh.close()
 
-
 ##########################################################
 def read_hdf5(h5path):
     """Read @h5py
@@ -48,10 +47,10 @@ def export_individual_axis(ax, fig, labels, outdir, pad=0.3, prefix='', fmt='pdf
     if len(ax.shape) == 1: onerow = True
     elif len(ax.shape) == 2: onerow = False
     else: raise Exception('Just handle 1D or 2D axes')
- 
+
     n = 1
     for el in ax.shape: n *= el
- 
+
     for k in range(n):
         if onerow:
             ax[k].set_title('')
@@ -96,3 +95,29 @@ def hex2rgb(hexcolours, normalized=False, alpha=None):
         rgbcolours = rgbcolours.astype(float) / 255
 
     return rgbcolours
+
+
+def generate_square_grid(minlat, maxlat, minlon, maxlon, delta, outfile):
+    """Generate grid and output to file
+
+    Args:
+    minlat(float): min latitude
+    maxlon(float): max latitude
+    minlon(float): min longitude
+    maxlon(float): max longitude
+    """
+    fh = open(outfile, 'w')
+    d = delta
+    nlat = int((maxlat - minlat)/d) + 1
+    nlon = int((maxlon - minlon)/d) + 1
+
+    fh.write('id,lat,lon\n')
+    id = 1
+    for i in range(nlat):
+        lat = round(minlat + i*d, 8)
+        for j in range(nlon):
+            lon = round(minlon + j*d, 8)
+            fh.write('{},{:.8f},{:.8f}\n'.format(id, lat, lon))
+            id += 1
+
+    fh.close()
