@@ -201,8 +201,8 @@ def compile_lists(listsdir, labelspath):
 
 #############################################################
 def compile_labels(annotdir, labelspath):
-    """Summarize @annotdir csv annotations in .txt format and output
-    summary to @labelspath """
+    """Summarize annotations in csv format in folder @annotdir into a .txt format
+    and output it to @labelspath """
     info(inspect.stack()[0][3] + '()')
 
     if os.path.exists(labelspath):
@@ -231,9 +231,13 @@ def compile_labels(annotdir, labelspath):
     return df
 
 ##########################################################
-def parse_infomap_results(graphml, infomapout, labelsdf, annotator,
+def link_labels_and_communities(graphml, infomapout, labelsdf, annotator,
         labelsclupath, vcoordspath):
-    """Find enclosing community given by @infomapout of each node in @graphml """
+    """Associate the graffiti annotation with the community structure given
+    by Infomap. The association is performed by nearest neighbour: given the
+    location of a graffiti occurrence, the nearest vertex of the city graph
+    is determined and the community id of it is identified.
+    """
     info(inspect.stack()[0][3] + '()')
 
     if os.path.exists(labelsclupath):
@@ -457,63 +461,21 @@ def filename_from_coords(x, y, heading, ext='jpg'):
     return '_{}_{}_{}.{}'.format(y, x, heading, ext)
 
 ##########################################################
-def calculate_correlations(dfclulabels, accessibpath, outdir, kdeparam='scott'):
-    """Calculate correlation"""
-    info(inspect.stack()[0][3] + '()')
-
-    dfaccessib = pd.read_csv(accessibpath)
-
-    if kdeparam < 0: kdebw = 'scott'
-    else: kdebw = kdeparam
-
-    corrs = {}
-    for l in np.unique(dfclulabels.label):
-        filtered = dfclulabels[dfclulabels.label == l]
-
-        graffloc = np.vstack([filtered.x, filtered.y])
-        kernel = stats.gaussian_kde(graffloc, bw_method=kdebw)
-        k = ker = kernel(np.vstack([dfaccessib.x.values, dfaccessib.y.values]))
-
-        corrs[l] = []
-        for col in sorted(dfaccessib.columns):
-            if not 'accessib' in col: continue
-            acc = dfaccessib[col].values
-            corr, pvalue = scipy.stats.pearsonr(k, acc)
-            corrs[l].append(corr)
-            info('accessib{}, label{}, corr:{}'.format(col, l, corr))
-
-    accessibs = []
-    for col in sorted(dfaccessib.columns):
-        if 'accessib' in col: accessibs.append(col)
-
-    corsdf = pd.DataFrame.from_dict(corrs, orient='index', columns=accessibs)
-    corsdf.to_csv(pjoin(outdir, 'corrs.csv'))
-
-##########################################################
-def correlate_count_and_accessib(dfclulabels, accessibpath, vcoords,
+def correlate_count_and_accessib(dfclulabels, accs, vcoords,
         outdir, kdebw='scott', filterinds=[], sufftype=''):
     """Plot count of graffiti vs accessibility for each vertex"""
     info(inspect.stack()[0][3] + '()')
 
-    accs = pd.read_csv(accessibpath, header=None).values.reshape(-1)
-
     graffloc = np.vstack([dfclulabels.x, dfclulabels.y])
     ker = stats.gaussian_kde(graffloc, bw_method=kdebw)
 
-    info('KERNEL dim:{}, n:{}, neff:{}, factor:{}, cov:{}'.\
-            format(ker.d, ker.n, ker.neff, ker.factor, ker.covariance))
-
+    # info('KERNEL dim:{}, n:{}, neff:{:.02f}, factor:{}, cov:{}'.\
+            # format(ker.d, ker.n, ker.neff, ker.factor, ker.covariance))
     if len(filterinds) > 0:
         vcoords = vcoords[filterinds]
         accs = accs[filterinds]
 
     probs = ker(vcoords.T)
-
-    # m = np.max(accs) / 3
-    # accs[accs > 2*m] = -3
-    # accs[accs > 1*m] = -2
-    # accs[accs > 0*m] = -1
-    # accs = -accs
 
     inds = np.argwhere(~np.isnan(accs)).flatten()
     figscale = 6
@@ -527,11 +489,41 @@ def correlate_count_and_accessib(dfclulabels, accessibpath, vcoords,
     axs.set_xlabel('Graffiti count', fontsize='xx-large')
     axs.set_ylabel('Accessibility', fontsize='xx-large')
 
-    accsuff = os.path.splitext(os.path.basename(accessibpath))[0]
-    axs.set_title('Accessib {}, KDE {:.02f}, Pearson {:.02f}'. \
-            format(accsuff, ker.factor, corr))
-    plt.tight_layout(1)
-    plt.savefig(pjoin(outdir, '{}_{:.02f}_type{}.png'.format(accsuff, ker.factor,
+    axs.set_title('KDE {:.02f}, Pearson {:.02f}'. \
+            format( ker.factor, corr))
+    plt.tight_layout(pad=1)
+    plt.savefig(pjoin(outdir, '{:.02f}_type{}.png'.format(ker.factor,
+        sufftype)))
+    return corr
+
+##########################################################
+def correlate_count_and_accessib_per_comm(dfclulabels, accs, vcoords,
+        outdir, kdebw='scott', sufftype=''):
+    """Plot count of graffiti vs accessibility for each vertex"""
+    info(inspect.stack()[0][3] + '()')
+
+    graffloc = np.vstack([dfclulabels.x, dfclulabels.y])
+    ker = stats.gaussian_kde(graffloc, bw_method=kdebw)
+
+    info('KERNEL dim:{}, n:{}, neff:{}, factor:{}, cov:{}'.\
+            format(ker.d, ker.n, ker.neff, ker.factor, ker.covariance))
+
+    probs = ker(vcoords.T)
+    inds = np.argwhere(~np.isnan(accs)).flatten()
+    figscale = 6
+    fig, axs = plt.subplots(1, 1,
+                figsize=(1.2*figscale, figscale))
+    plasma = matplotlib.cm.get_cmap('plasma', 100)
+    axs.scatter(probs[inds], accs[inds], s=4, alpha=0.2, c=[plasma(.2)])
+
+    corr, _ = scipy.stats.pearsonr(probs[inds], accs[inds])
+    axs.tick_params(axis='both', which='major', labelsize='x-large')
+    axs.set_xlabel('Graffiti count', fontsize='xx-large')
+    axs.set_ylabel('Accessibility', fontsize='xx-large')
+
+    axs.set_title('KDE {:.02f}, Pearson {:.02f}'.format(ker.factor, corr))
+    plt.tight_layout(pad=1)
+    plt.savefig(pjoin(outdir, '{:.02f}_type{}.png'.format(ker.factor,
         sufftype)))
     return corr
 
@@ -607,7 +599,7 @@ def plot_densities(df, xx, yy, mapx, mapy, outdir, kerbw='scott', filterinds=[])
 
     klddf = pd.DataFrame.from_dict(kld, orient='index', columns=['kld'])
     klddf.to_csv(pjoin(outdir, 'klds.csv'), index_label='type')
-    plt.tight_layout(2)
+    plt.tight_layout(pad=2)
     labels = ['mean', 'typeA', 'typeB', 'typeC']
     pads = [.1, .1, .6, .1]
 
@@ -778,8 +770,8 @@ def plot_gaussians(gins, n, outdir):
 
 ##########################################################
 def get_vertices_above_density(query, refcoords, r):
-    """Get indices of graph vertices which have at least one graff
-    occurrence nearby"""
+    """Get the indices of the vertices which have at least one graff
+    occurrence nearby within a distance @r"""
     info(inspect.stack()[0][3] + '()')
 
     from sklearn.neighbors import BallTree
@@ -789,7 +781,7 @@ def get_vertices_above_density(query, refcoords, r):
             np.deg2rad(np.c_[query[:, 0], query[:, 1]]), r=r/R,
             count_only=True)
     _, x = np.unique(counts, return_counts=True)
-    
+
     return np.where(counts > 0)
 
 ##########################################################
@@ -800,41 +792,75 @@ def main():
     parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
     args = parser.parse_args()
 
-    if not os.path.isdir(args.outdir): os.mkdir(args.outdir)
+    os.makedirs(args.outdir, exist_ok=True)
 
-    annotdir = './data/20200202-types/20200209-8003_annot/'
-    graphmlpath = './data/20200202-types/sp.graphml'
-    clupath = './data/20200202-types/20200222-infomap.clu'
-    shppath = './data/20200202-types/20200224-shp/'
-    cluareaspath = './data/20200202-types/20200222-infomap_areas.csv'
-    outlabels = pjoin(args.outdir, 'labels.csv')
-    labelsclu = 'data/labels_and_clu_nodupls.csv'
-    vcoordspath = 'data/vcoords.csv'
+    annotdir = './data/grafftypes/20200209-8003_annot/'
+    graphmlpath = './data/grafftypes/sp.graphml'
+    clupath = './data/grafftypes/20200222-infomap.clu'
+    shppath = './data/grafftypes/20200224-shp/'
+    cluareaspath = './data/grafftypes/20200222-infomap_areas.csv'
+    labelsclu = './data/grafftypes/20200601-combine_me_he/labels_and_clu_nodupls.csv'
+    vcoordspath = './data/grafftypes/0_graph/sp_vcoords.csv'
     c0 = [-46.6333, -23.5505] # Sao paulo
+    acc = '20'
+    # accpath = './data/grafftypes/20200630-accessib/acc{}.txt'.format(acc)
+    accpath = './data/grafftypes/20210518-sp_accessibs_selfavoiding/{}/sp_undirected_acc{}.txt'.format(acc, acc)
 
-    shppath = './data/20200224-shp/'
-    accpath = './data/20200630-accessib/acc20.txt'
+    minr = 500 # If no graff occurrence within this dist., exclude it
+    kerbw = .3 # Kernel bandwith
 
+    accs = pd.read_csv(accpath, header=None).values.reshape(-1)
     labelsdf = compile_labels(annotdir, labelsclu) # Do this for each annotator
-    labelsdf, vcoords = parse_infomap_results(graphmlpath, clupath, labelsdf,
-            'er', labelsclu, vcoordspath)
+    labelsdf, vcoords = link_labels_and_communities(graphmlpath, clupath, labelsdf,
+                                                    'er', labelsclu, vcoordspath)
+
     ngraff = len(labelsdf)
-    
+    vcount = len(vcoords)
+
     grcoords = [[labelsdf.iloc[i].x, labelsdf.iloc[i].y] for i in range(ngraff)]
     grcoords = np.array(grcoords)
 
-    minr = 300
-    kerbw = .3
+    indsdens = get_vertices_above_density(vcoords, grcoords, minr)
+    indsdens2 = np.zeros(len(vcoords), dtype=bool); indsdens2[indsdens] = True
 
-    # indsdens = get_vertices_above_density(vcoords, grcoords, minr)
-    # print(len(indsdens[0]))
-    # breakpoint()
-    
-    # for grtype in sorted(np.unique(labelsdf.label)):
-        # corr = correlate_count_and_accessib(labelsdf[labelsdf.label==grtype],
-                # accpath, vcoords, args.outdir, kerbw, indsdens, str(grtype))
-        # info('validnodes: {}, corr:{}'.format(
-            # len(indsdens[0]) if len(indsdens)>0 else 0, corr))
+    outdir = pjoin(args.outdir, 'acc{}'.format(acc));
+    os.makedirs(outdir, exist_ok=True)
+
+    vertexclu = pd.read_csv(clupath, sep=' ', skiprows=[0, 1], header=None,
+                            names=['node', 'comm', 'flow'])
+    vertexclu['node'] = vertexclu.node - 1 # Original index is 1-based
+    accsuff = os.path.splitext(os.path.basename(accpath))[0]
+
+    os.makedirs(outdir, exist_ok=True)
+    filtered = labelsdf
+
+    vcoords2 = vcoords[indsdens2] # Calculate correlation for the entire map
+    accs2 = accs[indsdens2]
+    for grtype in sorted(np.unique(labelsdf.label)):
+        corr = correlate_count_and_accessib_per_comm(
+                filtered.loc[filtered.label==grtype],
+                accs2, vcoords2, outdir, kerbw, str(grtype))
+        info('validnodes: {}, corr:{}'.format(
+            len(indsdens[0]) if len(indsdens)>0 else 0, corr))
+
+    for comm in np.unique(labelsdf.cluster): # Calculate correlation for each comm.
+        outdir = pjoin(args.outdir, '{}_comm{}'.format(accsuff, comm))
+        os.makedirs(outdir, exist_ok=True)
+        filtered = labelsdf.loc[labelsdf.cluster == comm]
+
+        filter2 = vertexclu.loc[vertexclu.comm == comm].node
+        filterinds2 = np.zeros(len(vcoords), dtype=bool)
+        filterinds2[filter2] = True
+
+        vcoords2 = vcoords[indsdens2 & filterinds2]
+        accs2 = accs[indsdens2 & filterinds2]
+
+        for grtype in sorted(np.unique(labelsdf.label)):
+            corr = correlate_count_and_accessib_per_comm(
+                    filtered.loc[filtered.label==grtype],
+                    accs2, vcoords2, outdir, kerbw, str(grtype))
+            info('validnodes: {}, corr:{}'.format(
+                len(indsdens[0]) if len(indsdens)>0 else 0, corr))
 
     # plot_types(clupath, shppath, labelsclu, args.outdir)
     # clus = sorted(np.unique(labelsdf.cluster))
@@ -843,8 +869,9 @@ def main():
     # plot_stacked_bar_types(results, len(clus), len(lbls),
             # palettehex3, args.outdir)
     # plot_counts_normalized(labelsclu, cluareaspath, args.outdir)
+    # correlate_count_and_accessib(dfclulabels, accessibpath, vcoords,
     plot_venn(labelsclu, args.outdir)
-    return
+    # return
 
     # Kernel density estimation
     info('Elapsed time:{}'.format(time.time()-t0))
@@ -869,6 +896,7 @@ def main():
     pdf, _ = compute_pdf_over_grid(labelsdf.x, labelsdf.y, xx, yy, kerbw)
     flattened = np.array([[x_, y_] for x_, y_ in zip(xx.flatten(), yy.flatten())])
     indsdensflat = get_vertices_above_density(flattened, grcoords, minr)
+
     ii = (indsdensflat[0]/ntilesy).astype(int)
     jj = (indsdensflat[0]%ntilesy).astype(int)
     indsdens = (ii, jj)
