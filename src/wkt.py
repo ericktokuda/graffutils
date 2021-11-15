@@ -19,11 +19,7 @@ import subprocess
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
-
-#############################################################
-def info(*args):
-    pref = datetime.now().strftime('[%y%m%d %H:%M:%S]')
-    print(pref, *args, file=sys.stdout)
+from myutils import info
 
 ##########################################################
 def get_areas_from_wkt(wktpath):
