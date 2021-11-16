@@ -187,7 +187,6 @@ def main(outdir):
     metadatadir = '/home/frodo/datasets/gsvcities/spac0005/nyc/metadata/'
     compile_metadata(metadatadir, outdir)
 
-
 ##########################################################
 if __name__ == "__main__":
     info(datetime.date.today())
