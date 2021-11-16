@@ -19,7 +19,7 @@ pip install -e .
 pip install pandas ipython erikunicamp-myutils
 ```
 
-To run, copy the created folder to `~/projects`:
+To run, copy the created folder to `~/projects`. And for now, the scripts must be executed from the *mmsegmentation/* folder
 ```
 cd ~/projects/mmsegmentation/
 mkdir checkpoints/
